@@ -116,8 +116,7 @@ common test-dependencies
 
 library
   import:          lang
-  exposed-modules:
-
+  exposed-modules: Plutarch.Types
   build-depends:
     , aeson
     , aeson-pretty
@@ -139,11 +138,3 @@ library
     , text
 
   hs-source-dirs:  src
-
--- test-suite plutarch-trie-test
---   import:         lang, test-dependencies
---   type:           exitcode-stdio-1.0
---   main-is:        Spec.hs
---   hs-source-dirs: test
---   other-modules:  Spec.TrieSpec
---   build-depends:  plutarch-trie
