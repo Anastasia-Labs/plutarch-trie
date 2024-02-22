@@ -1,5 +1,5 @@
 {
-  description = "A liqwid-nix Plutarch project";
+  description = "Plutarch Trie implementation";
 
   nixConfig = {
     extra-experimental-features = [ "nix-command" "flakes" "ca-derivations" ];

@@ -1,30 +1,35 @@
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
+
 module Plutarch.Utils (
   pinsert
+, pgetTrieId
+, pcountOfUniqueTokens
+, psingletonOfCS
+, pheadSingleton
+, passert
 ) where 
 
-import Plutarch.Prelude
-import Plutarch.Api.V1 (AmountGuarantees (..), KeyGuarantees (Sorted))
-import Plutarch.Api.V1.Value (padaSymbol, pvalueOf, pnormalize)
-import Plutarch.Api.V2 (
-  PAddress,
-  PCurrencySymbol,
-  PMap (PMap),
-  PPubKeyHash,
-  PTokenName,
-  PTxInInfo,
-  PTxOut,
-  PTxOutRef,
-  PValue (..),
- )
 import Data.Text qualified as T
 
+import Plutarch.Prelude
+import Plutarch.Api.V2 (
+  PCurrencySymbol,
+  PMap (PMap),
+  PTokenName,
+  PValue (..),
+ )
+import Plutarch.Monadic qualified as P
+import Plutarch.Api.V1.Value (KeyGuarantees)
+import Plutarch.Api.V2 (AmountGuarantees)
+
 pgetTrieId ::
-  forall (anyOrder::KeyGuarantees)(anyAmount::AmountGuarantees) (s :: S).
+  forall (anyOrder :: KeyGuarantees) (anyAmount :: AmountGuarantees) (s :: S).
   Term s (PValue anyOrder anyAmount :--> PCurrencySymbol :--> PByteString)
-pgetTrieId = phoistAcyclic # plam $ \val cs -> do
-  passert "Too many assets" $ pcountOfUniqueTokens # val #== 2
-  PPair tn amount <- pmatch $ psingletonOfCS # cs # val
-  pcon tn
+pgetTrieId = phoistAcyclic $ plam $ \val cs -> P.do
+  passert "Too many assets" (pcountOfUniqueTokens # val #== 2)
+  let x = psingletonOfCS # pdata cs # val
+  PPair tn _amount <- pmatch x
+  pto tn
 
 {- | Insert an element into a sorted list based on a comparison function. -}
 pinsert :: Term s (a :--> (a :--> a :--> PBool) :--> PList a :--> PList a)
