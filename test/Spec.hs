@@ -1,12 +1,12 @@
-module Main(main) where
+module Main (main) where
 
-import Spec.UtilsSpec(utilsTest)
+import Spec.UtilsSpec (utilsTest)
 import Test.Tasty (defaultMain, testGroup)
 
-main :: IO()
+main :: IO ()
 main = do
-  defaultMain $
-    testGroup
-      "Unit Test Group"
-      [ utilsTest
-      ]
+    defaultMain $
+        testGroup
+            "Unit Test Group"
+            [ utilsTest
+            ]

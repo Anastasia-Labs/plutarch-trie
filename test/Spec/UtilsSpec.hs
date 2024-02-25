@@ -2,9 +2,9 @@ module Spec.UtilsSpec (utilsTest) where
 
 import PlutusTx qualified
 
-import Plutarch.Utils (pinsert)
 import Plutarch.Prelude
-import Plutarch.Test.Precompiled ((@>), tryFromPTerm)
+import Plutarch.Test.Precompiled (tryFromPTerm, (@>))
+import Plutarch.Utils (pinsert)
 
 import Test.Tasty (TestTree)
 
