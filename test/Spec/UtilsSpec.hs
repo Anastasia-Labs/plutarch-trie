@@ -9,8 +9,8 @@ import Plutarch.Test.Precompiled ((@>), tryFromPTerm)
 import Test.Tasty (TestTree)
 
 -- A simple comparison function for integers that can be used with pinsert
-pcompare :: Term s (PInteger :--> PInteger :--> PBool)
-pcompare = plam (#<=)
+pcompare :: Term s (PAsData PInteger :--> PAsData PInteger :--> PBool)
+pcompare = plam $ \x y -> pfromData x #<= pfromData y
 
 -- utilsTest :: TestTree
 -- utilsTest = testGroup "pinsert tests"
@@ -34,7 +34,7 @@ utilsTest = tryFromPTerm "pinsert tests" testpinsert $ do
   -- [ PlutusTx.toData x, PlutusTx.toData lst ] @> "should be true"
  where
   testpinsert = plam $ \x l expected ->
-    pif (expected #== pinsert # x # pcompare # l)
+    pif (pfromData expected #== pinsert # pcompare # x # pfromData l)
         (pcon PUnit)
         (perror)
   -- testCase name $ do
