@@ -118,6 +118,7 @@ common test-dependencies
 library
   import:          lang
   exposed-modules:
+    Plutarch.Trie
     Plutarch.Types
     Plutarch.Utils
 

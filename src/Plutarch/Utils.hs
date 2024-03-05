@@ -25,14 +25,14 @@ pgetTrieId = phoistAcyclic $ plam $ \val cs -> P.do
     PPair tn _amount <- pmatch x
     pto tn
 
-{- | Insert an element into a sorted list based on a comparison function. -}
+-- | Insert an element into a sorted list based on a comparison function.
 pinsert :: forall (a :: PType) (s :: S). (PLift a) => Term s ((a :--> a :--> PBool) :--> a :--> PBuiltinList a :--> PBuiltinList a)
 pinsert = pfix #$ plam $ \self comp x lst ->
     -- Define the insertion function that takes an element and a list,
     -- and inserts the element into the list based on the comparison function.
     let insertFn = plam $ \y ys -> pif (comp # x # y) (pcons # x # ys) (pcons # y # (self # comp # x # ys)) -- !!! here in the true case we just discard y, it is definitely wrong, please fix it !!!
     -- Use foldr to traverse the list and insert the element in the correct position.
-    in pfoldr # insertFn # (pcons # x # pnil) # lst
+     in pfoldr # insertFn # (pcons # x # pnil) # lst
 
 -- | Probably more effective than `plength . pflattenValue`
 pcountOfUniqueTokens ::
