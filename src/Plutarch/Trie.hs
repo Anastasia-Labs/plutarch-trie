@@ -4,8 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
+
 module Plutarch.Trie (
 
 )
@@ -22,6 +21,8 @@ import Plutarch.Api.V1.Address (
 import Plutarch.Api.V2 (PTxInInfo)
 import Plutarch.Monadic qualified as P
 import Plutarch.Api.V2.Contexts(PTxInfo)
+import Plutarch.Api.V1.Maybe (PMaybeData(..))
+
 ptrieHandler ::
   ClosedTerm
     ( PStakingCredential
@@ -32,8 +33,8 @@ ptrieHandler ::
 ptrieHandler = phoistAcyclic $
   plam $ \cred rdm txinfo' ->  P.do
     info <- pletFields @'["inputs", "outputs", "mint"] txinfo'
-    inputs <- plet $ info.inputs
-    let inputs = pfilter # plam (\inp -> hasCredential # cred # inp) # inputs
+    inputs <- plet $ pfromData info.inputs
+    let inputs = pfilter @PBuiltinList # (plam (\inp -> hasCredential # cred # inp)) # inputs
     pmatch rdm $ \case 
       PGenesis info -> pcon PTrue
       PBetween idx -> pcon PFalse
@@ -42,7 +43,10 @@ ptrieHandler = phoistAcyclic $
 hasCredential :: ClosedTerm (PStakingCredential :--> PTxInInfo :--> PBool)
 hasCredential = phoistAcyclic $
   plam $ \cred info -> P.do
-    infoF <- pletFields @'["resolved"] info
-    txoutF <- pletFields @'["address"] info.resolved
-    addr' <- pletFields @'["credential"] txoutF.address
-    pif (cred #== addr'.credential) (pcon PTrue) (pcon PFalse)
+    let resolved = pfield @"resolved" # info
+        addr = pfield @"address" # resolved
+        -- addr = pfield @"credential" # txoutF
+        sc = pfield @"stakingCredential" # addr
+    pmatch sc $ \case
+      PDJust ((pfield @"_0" #) -> c) -> pif (cred #== c) (pcon PTrue) (pcon PFalse)
+      _ -> pcon PFalse
