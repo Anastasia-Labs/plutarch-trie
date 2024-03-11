@@ -21,7 +21,7 @@ import PlutusLedgerApi.V2 (
  )
 import PlutusTx qualified
 
-import Plutarch.Api.V2 (
+import Plutarch.Api.V1 (
     PTxOutRef,
  )
 
