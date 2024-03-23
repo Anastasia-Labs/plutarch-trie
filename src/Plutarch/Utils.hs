@@ -7,20 +7,17 @@ module Plutarch.Utils (
     psingletonOfCS,
     pheadSingleton,
     passert,
-    pinit,
-    ptake,
-    premoveIndexElement,
     premoveElement,
+    ptryLookupValue,
 ) where
 
 import Data.Text qualified as T
 
-import Numeric.Natural (Natural)
 import Plutarch.Api.V1.Value (KeyGuarantees)
 import Plutarch.Api.V2 (AmountGuarantees, PCurrencySymbol, PMap (PMap), PTokenName, PValue (..))
 import Plutarch.Monadic qualified as P
-import Plutarch.Prelude
 import Plutarch.Num ((#-))
+import Plutarch.Prelude
 
 pgetTrieId ::
     forall (anyOrder :: KeyGuarantees) (anyAmount :: AmountGuarantees) (s :: S).
@@ -100,26 +97,35 @@ passert ::
     Term s a
 passert longErrorMsg b inp = pif b inp $ ptraceError (pconstant longErrorMsg)
 
-pinit :: (PElemConstraint list a) => Term s (list a :--> list a)
-pinit = phoistAcyclic $ plam $ const perror
-
-ptake :: (PIsListLike list a) => Natural -> Term s (list a) -> Term s (list a)
-ptake n xs = ptake' n # xs
-  where
-    ptake' :: (PIsListLike list a) => Natural -> ClosedTerm (list a :--> list a)
-    ptake' 0 = plam id
-    ptake' 1 = pinit
-    ptake' n' = phoistAcyclic $ plam $ \x -> pinit #$ ptake' (n' - 1) # x
-
--- | Remove the element at the specified index from a list.
-premoveIndexElement :: (PIsListLike list a) => Natural -> Term s (list a) -> Term s (list a)
-premoveIndexElement index xs =
-    let taken = ptake index xs
-        rest = pdrop (index + 1) xs
-     in pconcat # taken # rest
-
 premoveElement :: (PIsListLike list a) => Term s (PInteger :--> list a :--> list a)
 premoveElement = phoistAcyclic $ plam $ (#) $ pfix #$ plam $ \self index l ->
-    pif (index #== 0)
+    pif
+        (index #== 0)
         (ptail # l)
         (pelimList (\x xs -> pcons # x # (self # (index #- 1) # xs)) l l)
+
+ptryLookupValue ::
+    forall
+        (keys :: KeyGuarantees)
+        (amounts :: AmountGuarantees)
+        (s :: S).
+    Term
+        s
+        ( PAsData PCurrencySymbol
+            :--> PValue keys amounts
+            :--> PBuiltinList (PBuiltinPair (PAsData PTokenName) (PAsData PInteger))
+        )
+ptryLookupValue = phoistAcyclic $
+    plam $ \policyId val ->
+        pmatch val $ \(PValue val') ->
+            precList
+                ( \self x xs ->
+                    pif
+                        (pfstBuiltin # x #== policyId)
+                        ( pmatch (pfromData (psndBuiltin # x)) $ \(PMap tokens) ->
+                            tokens
+                        )
+                        (self # xs)
+                )
+                (const perror)
+                # pto val'

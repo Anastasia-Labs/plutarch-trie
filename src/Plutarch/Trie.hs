@@ -20,7 +20,8 @@ import Plutarch.Api.V1.Address (
     PStakingCredential,
  )
 import Plutarch.Api.V1.Maybe (PMaybeData (..))
-import Plutarch.Api.V2 (POutputDatum (..), PTxInInfo, PCurrencySymbol (..))
+import Plutarch.Api.V1.Value (pnormalize)
+import Plutarch.Api.V2 (PCurrencySymbol (..), POutputDatum (..), PStakingCredential (..), PTxInInfo)
 import Plutarch.Api.V2.Contexts (PTxInfo)
 import Plutarch.Builtin (pforgetData, pserialiseData)
 import Plutarch.Crypto (pblake2b_256)
@@ -31,8 +32,7 @@ import Plutarch.Types (
     PTrieAction (..),
     PTrieDatum (..),
  )
-import Plutarch.Utils (passert, pgetTrieId, premoveElement)
-import Plutarch.Api.V2 (PStakingCredential(..))
+import Plutarch.Utils (passert, pgetTrieId, pheadSingleton, premoveElement, ptryLookupValue)
 
 ptrieHandler ::
     ClosedTerm
@@ -62,13 +62,39 @@ ptrieHandler = phoistAcyclic $
                 osOutputF <- pletFields @'["address", "value", "datum"] osOutput
                 POutputDatum newRawDatum' <- pmatch newOutputF.datum
                 POutputDatum osRawDatum' <- pmatch osOutputF.datum
-                let _newRawDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # newRawDatum')
+                let newRawDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # newRawDatum')
                     newValue = pfromData newOutputF.value
-                    _msOutputDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # osRawDatum')
+                    osRawDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # osRawDatum')
                     osValue = pfromData osOutputF.value
                     newId = pgetTrieId # newValue # ownCurrencySymbol
                     osId = pgetTrieId # osValue # ownCurrencySymbol
+                PTrieDatum newDatum <- pmatch newRawDatum
+                PTrieOriginState _ <- pmatch osRawDatum
+                newDatumF <- pletFields @'["key", "children"] newDatum
                 passert "Incorrect ids" (newId #== trieId #&& osId #== trieId)
+                passert
+                    "Must include the genesis input"
+                    ( pany @PBuiltinList
+                        # plam
+                            ( \inp ->
+                                let outRef = pfield @"outRef" # inp
+                                 in pif (outRef #== infoF.inp) (pcon PTrue) (pcon PFalse)
+                            )
+                        # inputs
+                    )
+                passert "Must empty key" (pfromData newDatumF.key #== pconstant "")
+                passert "Must no children" (pnull # pfromData newDatumF.children)
+                let tkPairs = ptryLookupValue # pdata ownCurrencySymbol # (pnormalize # txinfoF.mint)
+                    tkPair = pheadSingleton # tkPairs
+                    numMinted = psndBuiltin # tkPair
+                    tkMinted = pfstBuiltin # tkPair
+                    mintChecks =
+                        pfromData numMinted
+                            #== 2
+                            #&& trieId
+                            #== pto (pfromData tkMinted)
+
+                passert "Incorrect Minting" mintChecks
                 pif
                     (ptraceIfFalse "Trie Handler f1" (pnull # ins))
                     (pcon PTrue)
