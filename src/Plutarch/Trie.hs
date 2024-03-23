@@ -3,6 +3,7 @@
 -- {-# LANGUAGE PolyKinds #-}
 -- {-# LANGUAGE ScopedTypeVariables #-}
 -- {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 module Plutarch.Trie (
     ptrieHandler,
@@ -19,19 +20,19 @@ import Plutarch.Api.V1.Address (
     PStakingCredential,
  )
 import Plutarch.Api.V1.Maybe (PMaybeData (..))
-import Plutarch.Api.V2 (POutputDatum (..), PTxInInfo)
+import Plutarch.Api.V2 (POutputDatum (..), PTxInInfo, PCurrencySymbol (..))
 import Plutarch.Api.V2.Contexts (PTxInfo)
 import Plutarch.Builtin (pforgetData, pserialiseData)
 import Plutarch.Crypto (pblake2b_256)
-import Plutarch.Extra.ScriptContext (pfromPDatum, ptryFromInlineDatum)
+import Plutarch.Extra.ScriptContext (pfromPDatum)
 import Plutarch.Monadic qualified as P
 import Plutarch.Prelude
 import Plutarch.Types (
     PTrieAction (..),
     PTrieDatum (..),
  )
-import Plutarch.Utils (passert, pgetTrieId, premoveIndexElement)
-import "liqwid-plutarch-extra" Plutarch.Extra.TermCont (pletC, pletFieldsC, pmatchC)
+import Plutarch.Utils (passert, pgetTrieId, premoveElement)
+import Plutarch.Api.V2 (PStakingCredential(..))
 
 ptrieHandler ::
     ClosedTerm
@@ -42,8 +43,10 @@ ptrieHandler ::
         )
 ptrieHandler = phoistAcyclic $
     plam $ \cred rdm txinfo' -> P.do
-        PScriptCredential ownInputScriptCredential <- cred
-        ownCredHash <- plet (pfield @"_0" # ownInputScriptCredential)
+        PStakingHash ((pfield @"_0" #) -> ownCredential) <- pmatch cred
+        PScriptCredential ((pfield @"_0" #) -> ownCurrencySymbolByteString) <- pmatch ownCredential
+        let ownCurrencySymbol = (pcon . PCurrencySymbol . pfromData . pto) ownCurrencySymbolByteString
+        -- ownCredHash <- plet (pfield @"_0" # ownInputScriptCredential)
         txinfoF <- pletFields @'["inputs", "outputs", "mint"] txinfo'
         inputs <- plet $ pfromData txinfoF.inputs
         outputs <- plet $ pfromData txinfoF.outputs
@@ -52,19 +55,19 @@ ptrieHandler = phoistAcyclic $
             PGenesis info -> P.do
                 infoF <- pletFields @'["inp", "oidx"] info
                 let trieId = pblake2b_256 # (pserialiseData # pforgetData infoF.inp)
-                    expectedOutputs = premoveIndexElement #$ infoF.oidx #$ outputs
+                    expectedOutputs = premoveElement # infoF.oidx # outputs
                     newOutput = pelemAt # 0 # expectedOutputs
                     osOutput = pelemAt # 1 # expectedOutputs
                 newOutputF <- pletFields @'["address", "value", "datum"] newOutput
                 osOutputF <- pletFields @'["address", "value", "datum"] osOutput
                 POutputDatum newRawDatum' <- pmatch newOutputF.datum
                 POutputDatum osRawDatum' <- pmatch osOutputF.datum
-                let newRawDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # newRawDatum')
+                let _newRawDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # newRawDatum')
                     newValue = pfromData newOutputF.value
-                    msOutputDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # osRawDatum')
+                    _msOutputDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # osRawDatum')
                     osValue = pfromData osOutputF.value
-                    newId = pgetTrieId # newValue # ownCredHash
-                    osId = pgetTrieId # osValue # ownCredHash
+                    newId = pgetTrieId # newValue # ownCurrencySymbol
+                    osId = pgetTrieId # osValue # ownCurrencySymbol
                 passert "Incorrect ids" (newId #== trieId #&& osId #== trieId)
                 pif
                     (ptraceIfFalse "Trie Handler f1" (pnull # ins))

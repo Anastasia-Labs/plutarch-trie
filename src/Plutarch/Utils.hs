@@ -10,6 +10,7 @@ module Plutarch.Utils (
     pinit,
     ptake,
     premoveIndexElement,
+    premoveElement,
 ) where
 
 import Data.Text qualified as T
@@ -19,6 +20,7 @@ import Plutarch.Api.V1.Value (KeyGuarantees)
 import Plutarch.Api.V2 (AmountGuarantees, PCurrencySymbol, PMap (PMap), PTokenName, PValue (..))
 import Plutarch.Monadic qualified as P
 import Plutarch.Prelude
+import Plutarch.Num ((#-))
 
 pgetTrieId ::
     forall (anyOrder :: KeyGuarantees) (anyAmount :: AmountGuarantees) (s :: S).
@@ -115,3 +117,9 @@ premoveIndexElement index xs =
     let taken = ptake index xs
         rest = pdrop (index + 1) xs
      in pconcat # taken # rest
+
+premoveElement :: (PIsListLike list a) => Term s (PInteger :--> list a :--> list a)
+premoveElement = phoistAcyclic $ plam $ (#) $ pfix #$ plam $ \self index l ->
+    pif (index #== 0)
+        (ptail # l)
+        (pelimList (\x xs -> pcons # x # (self # (index #- 1) # xs)) l l)
