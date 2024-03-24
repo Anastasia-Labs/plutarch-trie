@@ -99,6 +99,7 @@ common test-dependencies
     , bytestring
     , hedgehog
     , hedgehog-quickcheck
+    , hspec
     , liqwid-plutarch-extra
     , plutarch
     , plutarch-context-builder
@@ -116,7 +117,11 @@ common test-dependencies
 
 library
   import:          lang
-  exposed-modules: Plutarch.Types
+  exposed-modules:
+    Plutarch.Trie
+    Plutarch.Types
+    Plutarch.Utils
+
   build-depends:
     , aeson
     , aeson-pretty
@@ -138,3 +143,11 @@ library
     , text
 
   hs-source-dirs:  src
+
+test-suite plutarch-trie-test
+  import:         lang, test-dependencies
+  type:           exitcode-stdio-1.0
+  main-is:        Spec.hs
+  hs-source-dirs: test
+  other-modules:  Spec.UtilsSpec
+  build-depends:  plutarch-trie

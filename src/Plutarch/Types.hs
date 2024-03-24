@@ -21,7 +21,7 @@ import PlutusLedgerApi.V2 (
  )
 import PlutusTx qualified
 
-import Plutarch.Api.V2 (
+import Plutarch.Api.V1 (
     PTxOutRef,
  )
 
@@ -70,12 +70,13 @@ PlutusTx.makeIsDataIndexed
     ]
 
 data PTrieDatum (s :: S)
-    = PTrieDatum (Term s (PDataRecord '["key" ':= PByteString, "children" ':= PBuiltinList PByteString]))
+    = PTrieDatum (Term s (PDataRecord '["key" ':= PByteString, "children" ':= PBuiltinList (PAsData PByteString)]))
     | PTrieOriginState (Term s (PDataRecord '["required_withdrawal" ':= PByteString]))
     deriving stock (Generic)
     deriving anyclass (PlutusType, PIsData, PEq)
 
 instance DerivePlutusType PTrieDatum where type DPTStrat _ = PlutusTypeData
+instance PTryFrom PData PTrieDatum
 
 -- deriving anyclass instance
 --   PTryFrom PData (PAsData PTrieDatum)

@@ -3,3 +3,4 @@ dist-newstyle
 .direnv
 tmp
 .pre-commit-config.yaml
+.vscode
