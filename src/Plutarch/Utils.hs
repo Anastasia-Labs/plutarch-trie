@@ -11,6 +11,7 @@ module Plutarch.Utils (
     ptryLookupValue,
     dataListReplace,
     toHex,
+    pcompareBS,
 ) where
 
 import Data.Text qualified as T
@@ -29,6 +30,9 @@ pgetTrieId = phoistAcyclic $ plam $ \val cs -> P.do
     let x = psingletonOfCS # pdata cs # val
     PPair tn _amount <- pmatch x
     pto tn
+
+pcompareBS :: Term s (PByteString :--> PByteString :--> PBool)
+pcompareBS = plam $ \x y -> x #<= y
 
 -- | Insert an element into a sorted list based on a comparison function.
 pinsert :: forall (a :: PType) (s :: S). (PLift a) => Term s ((a :--> a :--> PBool) :--> a :--> PBuiltinList a :--> PBuiltinList a)

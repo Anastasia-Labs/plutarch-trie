@@ -10,11 +10,6 @@ module Plutarch.Trie (
 )
 where
 
--- TrieAction (..),
--- TrieDatum (..),
-
--- PTrieDatum (..)
-
 import Plutarch.Api.V1.Address (
     PCredential (PScriptCredential),
     PStakingCredential,
@@ -32,7 +27,7 @@ import Plutarch.Types (
     PTrieAction (..),
     PTrieDatum (..),
  )
-import Plutarch.Utils (dataListReplace, passert, pgetTrieId, pheadSingleton, premoveElement, ptryLookupValue)
+import Plutarch.Utils (dataListReplace, passert, pcompareBS, pgetTrieId, pheadSingleton, pinsert, premoveElement, ptryLookupValue)
 
 ptrieHandler ::
     ClosedTerm
@@ -142,9 +137,11 @@ ptrieHandler = phoistAcyclic $
                 passert "Incorrect new key" (headKey #== (psliceBS # 0 # headKeyLength # newKey))
                 passert "Must empty new key suffix" (newKeySuffix #== pconstant "")
                 passert "Incorrect Minting" mintChecks
-                -- passert
-                --   "Must continuing UTxO has 1 single new child"
-                --   (pinsert # headDatumF.children # newKeySuffix # (#<=)) #== continuingDatumF.children
+                passert
+                    "Must continuing UTxO has 1 single new child"
+                    ( (pinsert # pcompareBS # newKeySuffix # (pmap @PBuiltinList # plam (\child -> pfromData child) # headDatumF.children))
+                        #== (pmap @PBuiltinList # plam (\child -> pfromData child) # continuingDatumF.children)
+                    )
                 passert
                     "Must include the genesis input"
                     ( pnot
