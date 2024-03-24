@@ -32,7 +32,7 @@ import Plutarch.Types (
     PTrieAction (..),
     PTrieDatum (..),
  )
-import Plutarch.Utils (passert, pgetTrieId, pheadSingleton, premoveElement, ptryLookupValue)
+import Plutarch.Utils (listReplace, passert, pgetTrieId, pheadSingleton, premoveElement, ptryLookupValue)
 
 ptrieHandler ::
     ClosedTerm
@@ -98,10 +98,12 @@ ptrieHandler = phoistAcyclic $
                     (ptraceIfFalse "Trie Handler f1" (pnull # ins))
                     (pcon PTrue)
                     (pcon PFalse)
-            POnto _continuingDatumFinfo -> P.do
-                let headInput = pelemAt # 0 # inputs
-                    continuingOutput = pelemAt # 0 # outputs
-                    newOutput = pelemAt # 1 # outputs
+            POnto info -> P.do
+                infoF <- pletFields @'["oidx"] info
+                let expectedOutputs = premoveElement # infoF.oidx # outputs
+                    headInput = pelemAt # 0 # inputs
+                    continuingOutput = pelemAt # 0 # expectedOutputs
+                    newOutput = pelemAt # 1 # expectedOutputs
                 headInputF <- pletFields @["address", "value", "datum"] $ pfield @"resolved" # headInput
                 continuingOutputF <- pletFields @'["address", "value", "datum"] continuingOutput
                 newOutputF <- pletFields @'["address", "value", "datum"] newOutput
@@ -157,7 +159,79 @@ ptrieHandler = phoistAcyclic $
                     (ptraceIfFalse "Trie Handler f2" (pnull @PBuiltinList # newDatumF.children))
                     (pcon PTrue)
                     (pcon PFalse)
-            PBetween _ -> pcon PFalse
+            PBetween info -> P.do
+                infoF <- pletFields @'["oidx"] info
+                let expectedOutputs = premoveElement # infoF.oidx # outputs
+                    parentInput = pelemAt # 0 # inputs
+                    continuingOutput = pelemAt # 0 # expectedOutputs
+                    newOutput = pelemAt # 1 # expectedOutputs
+                parentInputF <- pletFields @["address", "value", "datum"] $ pfield @"resolved" # parentInput
+                continuingOutputF <- pletFields @'["address", "value", "datum"] continuingOutput
+                newOutputF <- pletFields @'["address", "value", "datum"] newOutput
+                POutputDatum rawParentDatum' <- pmatch parentInputF.datum
+                POutputDatum rawContinuingDatum' <- pmatch continuingOutputF.datum
+                POutputDatum rawNewDatum' <- pmatch newOutputF.datum
+                let rawParentDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawParentDatum')
+                    rawContinuingDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawContinuingDatum')
+                    rawNewDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawNewDatum')
+                PTrieDatum parentDatum <- pmatch rawParentDatum
+                PTrieDatum continuingDatum <- pmatch rawContinuingDatum
+                PTrieDatum newDatum <- pmatch rawNewDatum
+                parentDatumF <- pletFields @'["key", "children"] parentDatum
+                continuingDatumF <- pletFields @'["key", "children"] continuingDatum
+                newDatumF <- pletFields @'["key", "children"] newDatum
+                let parentKey = parentDatumF.key
+                    parentKeyLength = plengthBS # parentKey
+                    contKey = continuingDatumF.key
+                    newKey = newDatumF.key
+                    newKeySuffix = psliceBS # parentKeyLength # (plengthBS # newKey - parentKeyLength) # newKey
+                    newKeySuffixFirstChar = psliceBS # 0 # 1 # newKeySuffix
+                    newKeySuffixLength = plengthBS # newKeySuffix
+                    contId = pgetTrieId # continuingOutputF.value # ownCurrencySymbol
+                PJust childKeySuffixData <-
+                    pmatch $
+                        pfind @PBuiltinList
+                            # plam
+                                ( \child ->
+                                    pif ((psliceBS # 0 # 1 # pfromData child) #== newKeySuffixFirstChar) (pcon PTrue) (pcon PFalse)
+                                )
+                            # parentDatumF.children
+                let childKeySuffix = pfromData childKeySuffixData
+                    newChildKeySuffix =
+                        psliceBS # newKeySuffixLength # (plengthBS # childKeySuffix - newKeySuffixLength) # childKeySuffix
+
+                passert
+                    "New key prefix child key"
+                    ((psliceBS # 0 # newKeySuffixLength # childKeySuffix) #== newKeySuffix)
+                passert
+                    "Child key isn't exactly new key"
+                    (pnot #$ newChildKeySuffix #== pconstant "")
+                passert
+                    "New key isn't exactly parent key"
+                    (pnot #$ newKeySuffix #== pconstant "")
+                passert
+                    "Parent prefixes new key"
+                    (parentKey #== (psliceBS # 0 # parentKeyLength # newKey))
+                passert
+                    "Parent key is unchanged"
+                    (parentKey #== contKey)
+                passert
+                    "All values are in same trie id"
+                    ( contId
+                        #== (pgetTrieId # newOutputF.value # ownCurrencySymbol)
+                        #&& contId
+                        #== (pgetTrieId # parentInputF.value # ownCurrencySymbol)
+                    )
+                passert
+                    "Parent children updated sensibly"
+                    ( plistEquals
+                        # continuingDatumF.children
+                        # (listReplace # childKeySuffix # newKeySuffix # parentDatumF.children)
+                    )
+                pif
+                    (ptraceIfFalse "Trie Handler f3" (newDatumF.children #== psingleton # newChildKeySuffix))
+                    (pcon PTrue)
+                    (pcon PFalse)
 
 hasCredential :: ClosedTerm (PStakingCredential :--> PTxInInfo :--> PBool)
 hasCredential = phoistAcyclic $
