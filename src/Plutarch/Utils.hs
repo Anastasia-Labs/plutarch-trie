@@ -19,7 +19,7 @@ import Data.Text qualified as T
 import Plutarch.Api.V1.Value (KeyGuarantees)
 import Plutarch.Api.V2 (AmountGuarantees, PCurrencySymbol, PMap (PMap), PTokenName, PValue (..))
 import Plutarch.Monadic qualified as P
-import Plutarch.Num ((#-))
+import Plutarch.Num ((#-), (#+))
 import Plutarch.Prelude
 
 pgetTrieId ::
@@ -148,16 +148,22 @@ dataListReplace = phoistAcyclic $ plam $ (#) $ pfix #$ plam $ \self original new
         l
         l
 
-{- | Convert PByteString to hexadecimal representation.
-TODO: @proxy please take a look at this function, it is not applied to trie handler yet
--}
+-- | Convert PByteString to hexadecimal representation.
 toHex :: Term s (PByteString :--> PByteString)
 toHex = phoistAcyclic $ plam $ \bytes ->
     encodeBase16 # bytes # ((plengthBS # bytes) - 1) # pconstant ""
 
 encodeBase16 :: Term s (PByteString :--> PInteger :--> PByteString :--> PByteString)
-encodeBase16 = phoistAcyclic $ plam $ \_ ix builder ->
+encodeBase16 = phoistAcyclic $ pfix #$ plam $ \self bytes ix builder ->
     pif
         (ix #< 0)
         builder
-        builder
+        (P.do
+            byte <- plet $ pindexBS # bytes # ix
+            msb <- plet $ pdiv # byte # 16
+            isb <- plet $ pmod # byte # 16
+            let fst = msb #+ (pif (msb #< 10) 48 87)
+                snd = isb #+ (pif (isb #< 10) 48 87)
+                consd = pconsBS # fst #$ pconsBS # snd # builder
+            self # bytes # (ix #- 1) # consd
+        )
