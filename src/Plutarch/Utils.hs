@@ -148,6 +148,9 @@ dataListReplace = phoistAcyclic $ plam $ (#) $ pfix #$ plam $ \self original new
         l
         l
 
+{- | Convert PByteString to hexadecimal representation.
+TODO: @proxy please take a look at this function, it is not applied to trie handler yet
+-}
 toHex :: Term s (PByteString :--> PByteString)
 toHex = phoistAcyclic $ plam $ \bytes ->
     encodeBase16 # bytes # ((plengthBS # bytes) - 1) # pconstant ""

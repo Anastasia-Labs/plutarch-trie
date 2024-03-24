@@ -149,5 +149,8 @@ test-suite plutarch-trie-test
   type:           exitcode-stdio-1.0
   main-is:        Spec.hs
   hs-source-dirs: test
-  other-modules:  Spec.UtilsSpec
+  other-modules:
+    Spec.TrieSpec
+    Spec.UtilsSpec
+
   build-depends:  plutarch-trie
