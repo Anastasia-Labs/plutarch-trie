@@ -9,6 +9,8 @@ module Plutarch.Utils (
     passert,
     premoveElement,
     ptryLookupValue,
+    listReplace,
+    toHex,
 ) where
 
 import Data.Text qualified as T
@@ -129,3 +131,26 @@ ptryLookupValue = phoistAcyclic $
                 )
                 (const perror)
                 # pto val'
+
+listReplace :: (PIsListLike list a, PEq a) => Term s (a :--> a :--> list a :--> list a)
+listReplace = phoistAcyclic $ plam $ (#) $ pfix #$ plam $ \self original new l ->
+    pelimList
+        ( \x xs ->
+            pif
+                (x #== original)
+                (pcons # new # (self # original # new # xs))
+                (pcons # x # (self # original # new # xs))
+        )
+        l
+        l
+
+toHex :: Term s (PByteString :--> PByteString)
+toHex = phoistAcyclic $ plam $ \bytes ->
+    encodeBase16 # bytes # ((plengthBS # bytes) - 1) # pconstant ""
+
+encodeBase16 :: Term s (PByteString :--> PInteger :--> PByteString :--> PByteString)
+encodeBase16 = phoistAcyclic $ plam $ \_ ix builder ->
+    pif
+        (ix #< 0)
+        builder
+        builder

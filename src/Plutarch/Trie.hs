@@ -105,7 +105,7 @@ ptrieHandler = phoistAcyclic $
                 headInputF <- pletFields @["address", "value", "datum"] $ pfield @"resolved" # headInput
                 continuingOutputF <- pletFields @'["address", "value", "datum"] continuingOutput
                 newOutputF <- pletFields @'["address", "value", "datum"] newOutput
-                let _trieId = pgetTrieId # headInputF.value # ownCurrencySymbol
+                let trieId = pgetTrieId # headInputF.value # ownCurrencySymbol
                 POutputDatum rawHeadDatum' <- pmatch headInputF.datum
                 POutputDatum rawContinuingDatum' <- pmatch continuingOutputF.datum
                 POutputDatum rawNewDatum' <- pmatch newOutputF.datum
@@ -115,11 +115,48 @@ ptrieHandler = phoistAcyclic $
                 PTrieDatum headDatum <- pmatch rawHeadDatum
                 PTrieDatum continuingDatum <- pmatch rawContinuingDatum
                 PTrieDatum newDatum <- pmatch rawNewDatum
-                _headDatumF <- pletFields @'["key", "children"] headDatum
-                _continuingDatumF <- pletFields @'["key", "children"] continuingDatum
-                _newDatumF <- pletFields @'["key", "children"] newDatum
-
-                pcon PFalse
+                headDatumF <- pletFields @'["key", "children"] headDatum
+                continuingDatumF <- pletFields @'["key", "children"] continuingDatum
+                newDatumF <- pletFields @'["key", "children"] newDatum
+                let headKey = headDatumF.key
+                    headKeyLength = plengthBS # headKey
+                    contKey = continuingDatumF.key
+                    newKey = newDatumF.key
+                    newKeySuffix = psliceBS # headKeyLength # (plengthBS # newKey - headKeyLength) # newKey
+                    newKeySuffixFirstChar = psliceBS # 0 # 1 # newKeySuffix
+                    contId = pgetTrieId # continuingOutputF.value # ownCurrencySymbol
+                    newId = pgetTrieId # newOutputF.value # ownCurrencySymbol
+                    tkPairs = ptryLookupValue # pdata ownCurrencySymbol # (pnormalize # txinfoF.mint)
+                    tkPair = pheadSingleton # tkPairs
+                    numMinted = psndBuiltin # tkPair
+                    tkMinted = pfstBuiltin # tkPair
+                    mintChecks =
+                        pfromData numMinted
+                            #== 1
+                            #&& trieId
+                            #== pto (pfromData tkMinted)
+                passert "Must cont key == head key" (contId #== trieId #&& newId #== trieId)
+                passert "Incorrect ids" (contKey #== headKey)
+                passert "Incorrect new key" (headKey #== (psliceBS # 0 # headKeyLength # newKey))
+                passert "Must empty new key suffix" (newKeySuffix #== pconstant "")
+                passert "Incorrect Minting" mintChecks
+                -- passert
+                --   "Must continuing UTxO has 1 single new child"
+                --   (pinsert # headDatumF.children # newKeySuffix # (#<=)) #== continuingDatumF.children
+                passert
+                    "Must include the genesis input"
+                    ( pnot
+                        #$ pany @PBuiltinList
+                        # plam
+                            ( \child ->
+                                pif ((psliceBS # 0 # 1 # pfromData child) #== newKeySuffixFirstChar) (pcon PTrue) (pcon PFalse)
+                            )
+                        # headDatumF.children
+                    )
+                pif
+                    (ptraceIfFalse "Trie Handler f2" (pnull @PBuiltinList # newDatumF.children))
+                    (pcon PTrue)
+                    (pcon PFalse)
             PBetween _ -> pcon PFalse
 
 hasCredential :: ClosedTerm (PStakingCredential :--> PTxInInfo :--> PBool)
