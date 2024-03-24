@@ -9,7 +9,7 @@ module Plutarch.Utils (
     passert,
     premoveElement,
     ptryLookupValue,
-    listReplace,
+    dataListReplace,
     toHex,
 ) where
 
@@ -132,13 +132,13 @@ ptryLookupValue = phoistAcyclic $
                 (const perror)
                 # pto val'
 
-listReplace :: (PIsListLike list a, PEq a) => Term s (a :--> a :--> list a :--> list a)
-listReplace = phoistAcyclic $ plam $ (#) $ pfix #$ plam $ \self original new l ->
+dataListReplace :: (PEq a, PIsData a) => Term s (a :--> a :--> PBuiltinList (PAsData a) :--> PBuiltinList (PAsData a))
+dataListReplace = phoistAcyclic $ plam $ (#) $ pfix #$ plam $ \self original new l ->
     pelimList
         ( \x xs ->
             pif
-                (x #== original)
-                (pcons # new # (self # original # new # xs))
+                (pfromData x #== original)
+                (pcons # pdata new # (self # original # new # xs))
                 (pcons # x # (self # original # new # xs))
         )
         l

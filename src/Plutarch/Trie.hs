@@ -32,7 +32,7 @@ import Plutarch.Types (
     PTrieAction (..),
     PTrieDatum (..),
  )
-import Plutarch.Utils (listReplace, passert, pgetTrieId, pheadSingleton, premoveElement, ptryLookupValue)
+import Plutarch.Utils (dataListReplace, passert, pgetTrieId, pheadSingleton, premoveElement, ptryLookupValue)
 
 ptrieHandler ::
     ClosedTerm
@@ -226,10 +226,10 @@ ptrieHandler = phoistAcyclic $
                     "Parent children updated sensibly"
                     ( plistEquals
                         # continuingDatumF.children
-                        # (listReplace # childKeySuffix # newKeySuffix # parentDatumF.children)
+                        # (dataListReplace # childKeySuffix # newKeySuffix # parentDatumF.children)
                     )
                 pif
-                    (ptraceIfFalse "Trie Handler f3" (newDatumF.children #== psingleton # newChildKeySuffix))
+                    (ptraceIfFalse "Trie Handler f3" (newDatumF.children #== psingleton # pdata newChildKeySuffix))
                     (pcon PTrue)
                     (pcon PFalse)
 
