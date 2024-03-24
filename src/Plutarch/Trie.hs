@@ -46,7 +46,6 @@ ptrieHandler = phoistAcyclic $
         PStakingHash ((pfield @"_0" #) -> ownCredential) <- pmatch cred
         PScriptCredential ((pfield @"_0" #) -> ownCurrencySymbolByteString) <- pmatch ownCredential
         let ownCurrencySymbol = (pcon . PCurrencySymbol . pfromData . pto) ownCurrencySymbolByteString
-        -- ownCredHash <- plet (pfield @"_0" # ownInputScriptCredential)
         txinfoF <- pletFields @'["inputs", "outputs", "mint"] txinfo'
         inputs <- plet $ pfromData txinfoF.inputs
         outputs <- plet $ pfromData txinfoF.outputs
@@ -99,8 +98,29 @@ ptrieHandler = phoistAcyclic $
                     (ptraceIfFalse "Trie Handler f1" (pnull # ins))
                     (pcon PTrue)
                     (pcon PFalse)
+            POnto _continuingDatumFinfo -> P.do
+                let headInput = pelemAt # 0 # inputs
+                    continuingOutput = pelemAt # 0 # outputs
+                    newOutput = pelemAt # 1 # outputs
+                headInputF <- pletFields @["address", "value", "datum"] $ pfield @"resolved" # headInput
+                continuingOutputF <- pletFields @'["address", "value", "datum"] continuingOutput
+                newOutputF <- pletFields @'["address", "value", "datum"] newOutput
+                let _trieId = pgetTrieId # headInputF.value # ownCurrencySymbol
+                POutputDatum rawHeadDatum' <- pmatch headInputF.datum
+                POutputDatum rawContinuingDatum' <- pmatch continuingOutputF.datum
+                POutputDatum rawNewDatum' <- pmatch newOutputF.datum
+                let rawHeadDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawHeadDatum')
+                    rawContinuingDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawContinuingDatum')
+                    rawNewDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawNewDatum')
+                PTrieDatum headDatum <- pmatch rawHeadDatum
+                PTrieDatum continuingDatum <- pmatch rawContinuingDatum
+                PTrieDatum newDatum <- pmatch rawNewDatum
+                _headDatumF <- pletFields @'["key", "children"] headDatum
+                _continuingDatumF <- pletFields @'["key", "children"] continuingDatum
+                _newDatumF <- pletFields @'["key", "children"] newDatum
+
+                pcon PFalse
             PBetween _ -> pcon PFalse
-            POnto _ -> pcon PFalse
 
 hasCredential :: ClosedTerm (PStakingCredential :--> PTxInInfo :--> PBool)
 hasCredential = phoistAcyclic $
