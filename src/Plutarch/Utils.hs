@@ -12,12 +12,13 @@ module Plutarch.Utils (
     dataListReplace,
     toHex,
     pcompareBS,
+    ptryOwnInput,
 ) where
 
 import Data.Text qualified as T
 
 import Plutarch.Api.V1.Value (KeyGuarantees)
-import Plutarch.Api.V2 (AmountGuarantees, PCurrencySymbol, PMap (PMap), PTokenName, PValue (..))
+import Plutarch.Api.V2 (AmountGuarantees, PCurrencySymbol, PMap (PMap), PTokenName, PTxInInfo, PTxOut, PTxOutRef, PValue (..))
 import Plutarch.Monadic qualified as P
 import Plutarch.Num ((#+), (#-))
 import Plutarch.Prelude
@@ -167,3 +168,8 @@ encodeBase16 = phoistAcyclic $ pfix #$ plam $ \self bytes ix builder ->
                 consd = pconsBS # fst #$ pconsBS # snd # builder
             self # bytes # (ix #- 1) # consd
         )
+
+ptryOwnInput :: (PIsListLike list PTxInInfo) => Term s (list PTxInInfo :--> PTxOutRef :--> PTxOut)
+ptryOwnInput = phoistAcyclic $
+    plam $ \inputs ownRef ->
+        precList (\self x xs -> pletFields @'["outRef", "resolved"] x $ \txInFields -> pif (ownRef #== txInFields.outRef) txInFields.resolved (self # xs)) (const perror) # inputs
