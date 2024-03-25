@@ -1,5 +1,5 @@
 module Spec.TrieSpec (
 
-) where 
+) where
 
 -- multivalidator implemented

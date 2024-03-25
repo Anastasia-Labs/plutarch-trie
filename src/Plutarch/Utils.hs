@@ -19,7 +19,7 @@ import Data.Text qualified as T
 import Plutarch.Api.V1.Value (KeyGuarantees)
 import Plutarch.Api.V2 (AmountGuarantees, PCurrencySymbol, PMap (PMap), PTokenName, PValue (..))
 import Plutarch.Monadic qualified as P
-import Plutarch.Num ((#-), (#+))
+import Plutarch.Num ((#+), (#-))
 import Plutarch.Prelude
 
 pgetTrieId ::
@@ -158,7 +158,7 @@ encodeBase16 = phoistAcyclic $ pfix #$ plam $ \self bytes ix builder ->
     pif
         (ix #< 0)
         builder
-        (P.do
+        ( P.do
             byte <- plet $ pindexBS # bytes # ix
             msb <- plet $ pdiv # byte # 16
             isb <- plet $ pmod # byte # 16
