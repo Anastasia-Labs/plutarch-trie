@@ -27,7 +27,7 @@ import Plutarch.Types (
     PTrieAction (..),
     PTrieDatum (..),
  )
-import Plutarch.Utils (dataListReplace, passert, pcompareBS, pgetTrieId, pheadSingleton, pinsert, premoveElement, ptryLookupValue)
+import Plutarch.Utils (dataListReplace, passert, pcompareBS, pgetTrieId, pheadSingleton, pinsert, premoveElement, ptryLookupValue, toHex)
 
 ptrieHandler ::
     ClosedTerm
@@ -115,10 +115,10 @@ ptrieHandler = phoistAcyclic $
                 headDatumF <- pletFields @'["key", "children"] headDatum
                 continuingDatumF <- pletFields @'["key", "children"] continuingDatum
                 newDatumF <- pletFields @'["key", "children"] newDatum
-                let headKey = headDatumF.key
+                let headKey = toHex # headDatumF.key
                     headKeyLength = plengthBS # headKey
-                    contKey = continuingDatumF.key
-                    newKey = newDatumF.key
+                    contKey = toHex # continuingDatumF.key
+                    newKey = toHex # newDatumF.key
                     newKeySuffix = psliceBS # headKeyLength # (plengthBS # newKey - headKeyLength) # newKey
                     newKeySuffixFirstChar = psliceBS # 0 # 1 # newKeySuffix
                     contId = pgetTrieId # continuingOutputF.value # ownCurrencySymbol
@@ -140,7 +140,7 @@ ptrieHandler = phoistAcyclic $
                 passert
                     "Must continuing UTxO has 1 single new child"
                     ( (pinsert # pcompareBS # newKeySuffix # (pmap @PBuiltinList # plam (\child -> pfromData child) # headDatumF.children))
-                        #== (pmap @PBuiltinList # plam (\child -> pfromData child) # continuingDatumF.children)
+                        #== (pmap @PBuiltinList # plam (\child -> toHex # pfromData child) # continuingDatumF.children)
                     )
                 passert
                     "Must include the genesis input"
@@ -177,10 +177,10 @@ ptrieHandler = phoistAcyclic $
                 parentDatumF <- pletFields @'["key", "children"] parentDatum
                 continuingDatumF <- pletFields @'["key", "children"] continuingDatum
                 newDatumF <- pletFields @'["key", "children"] newDatum
-                let parentKey = parentDatumF.key
+                let parentKey = toHex # parentDatumF.key
                     parentKeyLength = plengthBS # parentKey
-                    contKey = continuingDatumF.key
-                    newKey = newDatumF.key
+                    contKey = toHex # continuingDatumF.key
+                    newKey = toHex # newDatumF.key
                     newKeySuffix = psliceBS # parentKeyLength # (plengthBS # newKey - parentKeyLength) # newKey
                     newKeySuffixFirstChar = psliceBS # 0 # 1 # newKeySuffix
                     newKeySuffixLength = plengthBS # newKeySuffix
@@ -190,10 +190,10 @@ ptrieHandler = phoistAcyclic $
                         pfind @PBuiltinList
                             # plam
                                 ( \child ->
-                                    pif ((psliceBS # 0 # 1 # pfromData child) #== newKeySuffixFirstChar) (pcon PTrue) (pcon PFalse)
+                                    pif (toHex # (psliceBS # 0 # 1 # pfromData child) #== newKeySuffixFirstChar) (pcon PTrue) (pcon PFalse)
                                 )
                             # parentDatumF.children
-                let childKeySuffix = pfromData childKeySuffixData
+                let childKeySuffix = toHex # pfromData childKeySuffixData
                     newChildKeySuffix =
                         psliceBS # newKeySuffixLength # (plengthBS # childKeySuffix - newKeySuffixLength) # childKeySuffix
 
@@ -222,11 +222,11 @@ ptrieHandler = phoistAcyclic $
                 passert
                     "Parent children updated sensibly"
                     ( plistEquals
-                        # continuingDatumF.children
-                        # (dataListReplace # childKeySuffix # newKeySuffix # parentDatumF.children)
+                        # (pmap @PBuiltinList # plam (\child -> pdata (toHex # pfromData child)) # continuingDatumF.children)
+                        # (dataListReplace # childKeySuffix # newKeySuffix # (pmap @PBuiltinList # plam (\child -> pdata (toHex # pfromData child)) # parentDatumF.children))
                     )
                 pif
-                    (ptraceIfFalse "Trie Handler f3" (newDatumF.children #== psingleton # pdata newChildKeySuffix))
+                    (ptraceIfFalse "Trie Handler f3" ((pmap @PBuiltinList # plam (\child -> pdata (toHex # pfromData child)) # newDatumF.children) #== psingleton # pdata newChildKeySuffix))
                     (pcon PTrue)
                     (pcon PFalse)
 
