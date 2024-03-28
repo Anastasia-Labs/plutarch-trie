@@ -1,4 +1,4 @@
-module Plutarch.Multivalidator (multivalidator, spend, main) where
+module Plutarch.Multivalidator (validator, multivalidator, spend, main) where
 
 import Plutarch.Api.V1 (PCredential (..))
 import Plutarch.Api.V1.AssocMap qualified as AssocMap
@@ -11,6 +11,7 @@ import "liqwid-plutarch-extra" Plutarch.Extra.TermCont (
     pletC,
     pletFieldsC,
     pmatchC,
+    ptraceC,
  )
 
 import Plutarch.Trie (ptrieHandler)
@@ -38,6 +39,7 @@ multivalidator mintingPolicy spendingValidator = plam $ \redeemerOrDatum scriptC
 spend :: Term s PValidator
 spend = phoistAcyclic $
     plam $ \_ _ ctx -> unTermCont $ do
+        ptraceC "spend"
         ctxF <- pletFieldsC @'["txInfo", "purpose"] ctx
         PSpending ownRef' <- pmatchC ctxF.purpose
         ownRef <- pletC $ pfield @"_0" # ownRef'
@@ -53,6 +55,7 @@ spend = phoistAcyclic $
 main :: Term s PStakeValidator
 main = phoistAcyclic $
     plam $ \redeemer ctx -> unTermCont $ do
+        ptraceC "main"
         ctxF <- pletFieldsC @'["txInfo", "purpose"] ctx
         txInfoF <- pletFieldsC @'["wdrl"] ctxF.txInfo
         return $
@@ -70,3 +73,6 @@ main = phoistAcyclic $
                             (popaque $ pconstant ())
                             perror
                 _ -> perror
+
+validator :: Term s PValidator
+validator = multivalidator main spend
