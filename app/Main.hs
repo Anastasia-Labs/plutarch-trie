@@ -66,6 +66,7 @@ evalWithArgsT cfg x args = do
 
 writePlutusScript :: Config -> String -> FilePath -> ClosedTerm a -> IO ()
 writePlutusScript cfg title filepath term = do
+  putStrLn $ "Writing script to file " <> filepath <> "..."
   case evalT cfg term of
     Left e -> putStrLn (show e)
     Right (script, _, _) -> do
@@ -74,6 +75,7 @@ writePlutusScript cfg title filepath term = do
         plutusJson = object ["type" .= scriptType, "description" .= title, "cborHex" .= encodeSerialiseCBOR script]
         content = encodePretty plutusJson
       LBS.writeFile filepath content
+  putStrLn "...done"
 
 writePlutusScriptTraceBind :: String -> FilePath -> ClosedTerm a -> IO ()
 writePlutusScriptTraceBind title filepath term =
@@ -92,6 +94,6 @@ main = do
   putStrLn "Writing Plutus Scripts to files"
   writePlutusScriptNoTrace "Multivalidator" "./compiled/multivalidator.json" validator
 
-  writePlutusScriptTraceBind "Multivalidator" "./compiled/multivalidatorbind.json" validator
+  -- writePlutusScriptTraceBind "Multivalidator" "./compiled/multivalidatorbind.json" validator
 
-  writePlutusScriptTrace "Multivalidator" "./compiled/multivalidatortrace.json" validator
+  -- writePlutusScriptTrace "Multivalidator" "./compiled/multivalidatortrace.json" validator

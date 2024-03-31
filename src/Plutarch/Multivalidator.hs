@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-local-binds #-}
 module Plutarch.Multivalidator (validator, multivalidator, spend, main) where
 
 import Plutarch.Api.V1 (PCredential (..))
@@ -16,6 +19,7 @@ import "liqwid-plutarch-extra" Plutarch.Extra.TermCont (
 
 import Plutarch.Trie (ptrieHandler)
 import Plutarch.Types (PTrieAction (..))
+import Plutarch.ByteString (pbyteStr)
 
 {- | multivalidator:
 In order for this script to be able to determine which script to delegate the call
@@ -37,7 +41,7 @@ multivalidator mintingPolicy spendingValidator = plam $ \redeemerOrDatum scriptC
         (punsafeCoerce $ mintingPolicy # redeemerOrDatum # (punsafeCoerce scriptContextOrRedeemer))
 
 spend :: Term s PValidator
-spend = phoistAcyclic $
+spend =
     plam $ \_ _ ctx -> unTermCont $ do
         ptraceC "spend"
         ctxF <- pletFieldsC @'["txInfo", "purpose"] ctx
@@ -53,23 +57,22 @@ spend = phoistAcyclic $
                 PNothing -> perror
 
 main :: Term s PStakeValidator
-main = phoistAcyclic $
+main =
     plam $ \redeemer ctx -> unTermCont $ do
         ptraceC "main"
         ctxF <- pletFieldsC @'["txInfo", "purpose"] ctx
         txInfoF <- pletFieldsC @'["wdrl"] ctxF.txInfo
         return $
             pmatch ctxF.purpose $ \case
-                PMinting ((pfield @"_0" #) -> policy) -> do
+                PMinting ((pfield @"_0" #) -> policy) ->
                     let csByteString = (pfromData . pto) policy
-                    let ownCredential = pcon $ PStakingHash $ pdcons @"_0" # (pdata $ pcon $ PScriptCredential $ pdcons @"_0" # (pdata . pcon . PScriptHash) csByteString # pdnil) # pdnil
+                        ownCredential = pcon $ PStakingHash $ pdcons @"_0" # (pdata $ pcon $ PScriptCredential $ pdcons @"_0" # (pdata . pcon . PScriptHash) csByteString # pdnil) # pdnil
                      in pmatch (AssocMap.plookup # ownCredential # txInfoF.wdrl) $ \case
                             PJust _ -> (popaque $ pconstant ())
                             PNothing -> perror
                 PRewarding ((pfield @"_0" #) -> stakeCred) ->
                     let red = punsafeCoerce @_ @_ @PTrieAction redeemer
-                     in pif
-                            (ptrieHandler # stakeCred # red # ctxF.txInfo)
+                     in pif (ptrieHandler # stakeCred # red # ctxF.txInfo)
                             (popaque $ pconstant ())
                             perror
                 _ -> perror

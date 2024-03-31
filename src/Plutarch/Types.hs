@@ -6,6 +6,7 @@
 module Plutarch.Types (
     TrieAction (..),
     TrieDatum (..),
+    PGenesisDataRecord,
     PTrieAction (..),
     PTrieDatum (..),
 ) where
@@ -38,8 +39,10 @@ PlutusTx.makeIsDataIndexed
     , ('Onto, 2)
     ]
 
+type PGenesisDataRecord = PDataRecord '["inp" ':= PTxOutRef, "oidx" ':= PInteger]
+
 data PTrieAction (s :: S)
-    = PGenesis (Term s (PDataRecord '["inp" ':= PTxOutRef, "oidx" ':= PInteger]))
+    = PGenesis (Term s PGenesisDataRecord)
     | PBetween (Term s (PDataRecord '["oidx" ':= PInteger]))
     | POnto (Term s (PDataRecord '["oidx" ':= PInteger]))
     deriving stock (Generic)

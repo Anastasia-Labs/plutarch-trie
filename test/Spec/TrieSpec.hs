@@ -2,7 +2,6 @@ module Spec.TrieSpec (
     unitTest,
 ) where
 
-import Plutarch.Api.V2 (PValidator)
 import Plutarch.Context (
     UTXO,
     address,
@@ -15,8 +14,7 @@ import Plutarch.Context (
     withValue,
     withdrawal,
  )
-import Plutarch.Multivalidator (main, multivalidator, spend)
-import Plutarch.Prelude
+import Plutarch.Multivalidator (validator)
 import Plutarch.Test.Precompiled (Expectation (Success), testEvalCase, tryFromPTerm)
 import Plutarch.Types (TrieAction (..), TrieDatum (..))
 import PlutusLedgerApi.V2 (
@@ -33,10 +31,6 @@ import PlutusLedgerApi.V2 (
  )
 import PlutusTx qualified
 import Test.Tasty (TestTree)
-
--- multivalidator implemented
-validator :: Term s PValidator
-validator = multivalidator main spend
 
 genesisPKH :: PubKeyHash
 genesisPKH = "b1f2f20a8781a3ba967d8c7b5068d21d799e809dcce22f651679d661"
