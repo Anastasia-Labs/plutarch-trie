@@ -20,13 +20,13 @@ module Plutarch.Utils (
 
 import Data.Text qualified as T
 
-import qualified Plutarch.Api.V1.AssocMap as AssocMap
+import Plutarch.Api.V1 (AmountGuarantees (..))
+import Plutarch.Api.V1.AssocMap qualified as AssocMap
 import Plutarch.Api.V1.Value (KeyGuarantees)
 import Plutarch.Api.V2 (AmountGuarantees, PCurrencySymbol, PMap (PMap), PTokenName, PTxInInfo, PTxOut, PTxOutRef, PValue (..))
 import Plutarch.Monadic qualified as P
 import Plutarch.Num ((#+), (#-))
 import Plutarch.Prelude
-import Plutarch.Api.V1 (AmountGuarantees(..))
 
 pgetTrieId ::
     forall (anyOrder :: KeyGuarantees) (anyAmount :: AmountGuarantees) (s :: S).
@@ -44,12 +44,14 @@ pcompareBS = plam $ \x y -> x #<= y
 pinsert :: forall (a :: PType) (s :: S). (PLift a) => Term s ((a :--> a :--> PBool) :--> a :--> PBuiltinList a :--> PBuiltinList a)
 pinsert = plam $ \cmp x ->
     precList
-      (\self y ys -> ptrace "look at me fly 2!!!" $
-        pif (cmp # x # y)
-            (pcons # x # (pcons # y # ys))
-            (pcons # y # (self # ys))
-      )
-      (const $ pcons # x # pnil)
+        ( \self y ys ->
+            ptrace "look at me fly 2!!!" $
+                pif
+                    (cmp # x # y)
+                    (pcons # x # (pcons # y # ys))
+                    (pcons # y # (self # ys))
+        )
+        (const $ pcons # x # pnil)
 
 -- | Probably more effective than `plength . pflattenValue`
 pcountOfUniqueTokens ::
@@ -135,7 +137,7 @@ ptryLookupValue ::
 ptryLookupValue =
     plam $ \policyId val ->
         pmatch (AssocMap.plookup # policyId # pto val) $ \case
-            PJust x  -> pto x
+            PJust x -> pto x
             PNothing -> perror
 
 dataListReplace :: (PEq a, PIsData a) => Term s (a :--> a :--> PBuiltinList (PAsData a) :--> PBuiltinList (PAsData a))
@@ -153,21 +155,21 @@ dataListReplace = pfix #$ plam $ \self original new l ->
 -- | Convert PByteString to hexadecimal representation.
 toHex :: Term s (PByteString :--> PByteString)
 toHex = plam $ \bytes ->
-        encodeBase16 # bytes # ((plengthBS # bytes) #- 1) # pconstant ""
-    where
-        encodeBase16 = pfix #$ plam $ \self bytes ix builder ->
-            pif
-                (ix #< 0)
-                builder
-                ( P.do
-                    byte <- plet $ pindexBS # bytes # ix
-                    msb <- plet $ pdiv # byte # 16
-                    isb <- plet $ pmod # byte # 16
-                    let fst = msb #+ (pif (msb #< 10) 48 87)
-                        snd = isb #+ (pif (isb #< 10) 48 87)
-                        consd = pconsBS # fst #$ pconsBS # snd # builder
-                    self # bytes # (ix #- 1) # consd
-                )
+    encodeBase16 # bytes # ((plengthBS # bytes) #- 1) # pconstant ""
+  where
+    encodeBase16 = pfix #$ plam $ \self bytes ix builder ->
+        pif
+            (ix #< 0)
+            builder
+            ( P.do
+                byte <- plet $ pindexBS # bytes # ix
+                msb <- plet $ pdiv # byte # 16
+                isb <- plet $ pmod # byte # 16
+                let fst = msb #+ (pif (msb #< 10) 48 87)
+                    snd = isb #+ (pif (isb #< 10) 48 87)
+                    consd = pconsBS # fst #$ pconsBS # snd # builder
+                self # bytes # (ix #- 1) # consd
+            )
 
 ptryOwnInput :: (PIsListLike list PTxInInfo) => Term s (list PTxInInfo :--> PTxOutRef :--> PTxOut)
 ptryOwnInput =
@@ -175,28 +177,28 @@ ptryOwnInput =
         precList (\self x xs -> pletFields @'["outRef", "resolved"] x $ \txInFields -> pif (ownRef #== txInFields.outRef) txInFields.resolved (self # xs)) (const perror) # inputs
 
 pnormalize ::
-  forall (any :: AmountGuarantees) (s :: S).
-  Term s (PValue 'AssocMap.Sorted any :--> PValue 'AssocMap.Sorted 'NonZero)
+    forall (any :: AmountGuarantees) (s :: S).
+    Term s (PValue 'AssocMap.Sorted any :--> PValue 'AssocMap.Sorted 'NonZero)
 pnormalize =
-  plam $ \value ->
-    pcon . PValue $
-      AssocMap.pmapMaybe # plam normalizeTokenMap # pto value
+    plam $ \value ->
+        pcon . PValue $
+            AssocMap.pmapMaybe # plam normalizeTokenMap # pto value
   where
     normalizeTokenMap ::
-      forall (s' :: S) (k :: S -> Type) (any1 :: AssocMap.KeyGuarantees).
-      Term s' (AssocMap.PMap any1 k PInteger) ->
-      Term s' (PMaybe (AssocMap.PMap any1 k PInteger))
+        forall (s' :: S) (k :: S -> Type) (any1 :: AssocMap.KeyGuarantees).
+        Term s' (AssocMap.PMap any1 k PInteger) ->
+        Term s' (PMaybe (AssocMap.PMap any1 k PInteger))
     normalizeTokenMap tokenMap =
-      plet (AssocMap.pmapMaybeData # plam nonZero # tokenMap) $ \normalMap ->
-        pif
-          (AssocMap.pnull # normalMap)
-          (pcon PNothing)
-          (pcon $ PJust normalMap)
+        plet (AssocMap.pmapMaybeData # plam nonZero # tokenMap) $ \normalMap ->
+            pif
+                (AssocMap.pnull # normalMap)
+                (pcon PNothing)
+                (pcon $ PJust normalMap)
     nonZero ::
-      forall (s' :: S).
-      Term s' (PAsData PInteger) ->
-      Term s' (PMaybe (PAsData PInteger))
+        forall (s' :: S).
+        Term s' (PAsData PInteger) ->
+        Term s' (PMaybe (PAsData PInteger))
     nonZero intData =
-      pif (intData #== zeroData) (pcon PNothing) (pcon $ PJust intData)
+        pif (intData #== zeroData) (pcon PNothing) (pcon $ PJust intData)
     zeroData :: forall (s' :: S). Term s' (PAsData PInteger)
     zeroData = pdata 0

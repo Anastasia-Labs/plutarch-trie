@@ -165,8 +165,7 @@ executable plutarch-trie-exec
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
-  build-depends: 
-    ,plutarch-trie
+  build-depends:
     , aeson
     , aeson-pretty
     , base
@@ -177,6 +176,7 @@ executable plutarch-trie-exec
     , liqwid-plutarch-extra
     , plutarch
     , plutarch-extra
+    , plutarch-trie
     , plutus-core
     , plutus-ledger-api
     , plutus-tx
@@ -185,6 +185,5 @@ executable plutarch-trie-exec
     , prettyprinter
     , serialise
     , text
-   
 
   hs-source-dirs: app

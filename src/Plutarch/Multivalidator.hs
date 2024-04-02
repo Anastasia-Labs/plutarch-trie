@@ -1,6 +1,7 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_GHC -Wno-unused-local-binds #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+
 module Plutarch.Multivalidator (validator, multivalidator, spend, main) where
 
 import Plutarch.Api.V1 (PCredential (..))
@@ -17,9 +18,9 @@ import "liqwid-plutarch-extra" Plutarch.Extra.TermCont (
     ptraceC,
  )
 
+import Plutarch.ByteString (pbyteStr)
 import Plutarch.Trie (ptrieHandler)
 import Plutarch.Types (PTrieAction (..))
-import Plutarch.ByteString (pbyteStr)
 
 {- | multivalidator:
 In order for this script to be able to determine which script to delegate the call
@@ -72,7 +73,8 @@ main =
                             PNothing -> perror
                 PRewarding ((pfield @"_0" #) -> stakeCred) ->
                     let red = punsafeCoerce @_ @_ @PTrieAction redeemer
-                     in pif (ptrieHandler # stakeCred # red # ctxF.txInfo)
+                     in pif
+                            (ptrieHandler # stakeCred # red # ctxF.txInfo)
                             (popaque $ pconstant ())
                             perror
                 _ -> perror
