@@ -20,10 +20,9 @@ module Plutarch.Utils (
 
 import Data.Text qualified as T
 
-import Plutarch.Api.V1 (AmountGuarantees (..))
 import Plutarch.Api.V1.AssocMap qualified as AssocMap
 import Plutarch.Api.V1.Value (KeyGuarantees)
-import Plutarch.Api.V2 (AmountGuarantees, PCurrencySymbol, PMap (PMap), PTokenName, PTxInInfo, PTxOut, PTxOutRef, PValue (..))
+import Plutarch.Api.V2 (AmountGuarantees(..), PCurrencySymbol, PMap (PMap), PTokenName, PTxInInfo, PTxOut, PTxOutRef, PValue (..))
 import Plutarch.Monadic qualified as P
 import Plutarch.Num ((#+), (#-))
 import Plutarch.Prelude
