@@ -31,7 +31,7 @@ import Plutarch.Api.V1 (AmountGuarantees(..))
 pgetTrieId ::
     forall (anyOrder :: KeyGuarantees) (anyAmount :: AmountGuarantees) (s :: S).
     Term s (PValue anyOrder anyAmount :--> PCurrencySymbol :--> PByteString)
-pgetTrieId = plam $ \val cs -> P.do
+pgetTrieId = phoistAcyclic $ plam $ \val cs -> P.do
     passert "Too many assets" (pcountOfUniqueTokens # val #== 2)
     let x = psingletonOfCS # pdata cs # val
     PPair tn _amount <- pmatch x
@@ -44,12 +44,12 @@ pcompareBS = plam $ \x y -> x #<= y
 pinsert :: forall (a :: PType) (s :: S). (PLift a) => Term s ((a :--> a :--> PBool) :--> a :--> PBuiltinList a :--> PBuiltinList a)
 pinsert = plam $ \cmp x ->
     precList
-      (\self y ys ->
+      (\self y ys -> ptrace "look at me fly 2!!!" $
         pif (cmp # x # y)
             (pcons # x # (pcons # y # ys))
             (pcons # y # (self # ys))
       )
-      (const pnil)
+      (const $ pcons # x # pnil)
 
 -- | Probably more effective than `plength . pflattenValue`
 pcountOfUniqueTokens ::
