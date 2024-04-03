@@ -10,6 +10,7 @@
   - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
     - [Building and Developing](#building-and-developing)
+    - [How to use](#how-to-use)
 
 <!-- markdown-toc end -->
 
@@ -124,7 +125,16 @@ Navigate to the repository directory:
 
 ```sh
 cd plutarch-trie
+direnv allow
 ```
+
+Activate the development environment with Nix:
+
+```sh
+nix develop .
+```
+
+Additionally, when you run `nix run .#help` you'll get a list of scripts you can run, the Github CI (nix flake check) is setup in a way where it checks the project builds successfully, haskell format is done correctly, and commit message follows conventional commits. Before pushing you should run `cabal run` , `nix run .#haskellFormat` (automatically formats all haskell files, including cabal), if you want to commit a correct format message you can run `cz commit`
 
 Build:
 
@@ -136,4 +146,24 @@ Execute the test suite:
 
 ```sh
 cabal test
+```
+
+![plutarch-trie.gif](/assets/images/plutarch-trie.gif)
+
+### How to use
+
+To integrate the Plutarch Trie library into your project, start by creating a `cabal.project` file, as this file is not automatically generated during the cabal init process. Then, proceed by including the following:
+
+```filename="cabal.project"
+source-repository-package
+  type: git
+  location: git://github.com/Anastasia-Labs/plutarch-trie.git
+```
+
+Then in the your `[name of your project].cabal` file include the repository under the build-depends section
+
+```filename="[name of your project].cabal" {3}
+build-depends:
+    base ^>= 4.11.1.0
+  , plutarch-trie
 ```

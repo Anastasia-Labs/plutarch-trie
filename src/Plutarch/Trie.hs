@@ -1,12 +1,4 @@
--- {-# LANGUAGE AllowAmbiguousTypes #-}
--- {-# LANGUAGE OverloadedRecordDot #-}
--- {-# LANGUAGE PolyKinds #-}
--- {-# LANGUAGE ScopedTypeVariables #-}
--- {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
-{-# OPTIONS_GHC -Wno-unused-local-binds #-}
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 
 module Plutarch.Trie (
     ptrieHandler,
@@ -17,8 +9,7 @@ import Plutarch.Api.V1.Address (
     PCredential (PScriptCredential),
     PStakingCredential,
  )
-import Plutarch.Api.V1.Maybe (PMaybeData (..))
-import Plutarch.Api.V2 (PCurrencySymbol (..), POutputDatum (..), PStakingCredential (..), PTxInInfo)
+import Plutarch.Api.V2 (PCurrencySymbol (..), PStakingCredential (..), PTxInInfo)
 import Plutarch.Api.V2.Contexts (PTxInfo)
 import Plutarch.Builtin (pforgetData, pserialiseData)
 import Plutarch.Crypto (pblake2b_256)

@@ -1,7 +1,3 @@
-{-# OPTIONS_GHC -Wno-unused-imports #-}
-{-# OPTIONS_GHC -Wno-unused-local-binds #-}
-{-# OPTIONS_GHC -Wno-unused-matches #-}
-
 module Plutarch.Multivalidator (validator, multivalidator, spend, main) where
 
 import Plutarch.Api.V1 (PCredential (..))
@@ -9,6 +5,8 @@ import Plutarch.Api.V1.AssocMap qualified as AssocMap
 import Plutarch.Api.V2 (PScriptContext, PScriptHash (..), PScriptPurpose (..), PStakeValidator, PStakingCredential (..), PValidator)
 import Plutarch.Builtin (pasConstr)
 import Plutarch.Prelude
+import Plutarch.Trie (ptrieHandler)
+import Plutarch.Types (PTrieAction (..))
 import Plutarch.Unsafe (punsafeCoerce)
 import Plutarch.Utils (ptryOwnInput)
 import "liqwid-plutarch-extra" Plutarch.Extra.TermCont (
@@ -17,10 +15,6 @@ import "liqwid-plutarch-extra" Plutarch.Extra.TermCont (
     pmatchC,
     ptraceC,
  )
-
-import Plutarch.ByteString (pbyteStr)
-import Plutarch.Trie (ptrieHandler)
-import Plutarch.Types (PTrieAction (..))
 
 {- | multivalidator:
 In order for this script to be able to determine which script to delegate the call
