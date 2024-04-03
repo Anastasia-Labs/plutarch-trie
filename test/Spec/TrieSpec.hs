@@ -15,7 +15,7 @@ import Plutarch.Context (
     withdrawal,
  )
 import Plutarch.Multivalidator (validator)
-import Plutarch.Test.Precompiled (Expectation (Success), testEvalCase, tryFromPTerm)
+import Plutarch.Test.Precompiled (Expectation (Failure, Success), testEvalCase, tryFromPTerm)
 import Plutarch.Types (TrieAction (..), TrieDatum (..))
 import PlutusLedgerApi.V2 (
     Address (..),
@@ -107,11 +107,155 @@ createTrieContext =
             , withdrawal rewardingCred 0
             ]
 
+createTrieInvalidContext :: ScriptContext
+createTrieInvalidContext =
+    buildMinting' $
+        mconcat
+            [ input genesisUTXO
+            , output outputTrieUTXO
+            , output outputOriginUTXO
+            , mint mintTrieValue
+            , withMinting trieCurrencySymbol
+            , withdrawal stakeCred 0
+            ]
+
+appendRedeemer :: TrieAction
+appendRedeemer = Onto 0
+
+newParentDatum :: TrieDatum
+newParentDatum = TrieDatum "" ["68656c6c6f5f776f726c64"]
+
+childDatum :: TrieDatum
+childDatum = TrieDatum "68656c6c6f5f776f726c64" []
+
+parentTrieUTXO :: UTXO
+parentTrieUTXO =
+    mconcat
+        [ address trieAddress
+        , withValue outputTrieValue
+        , withInlineDatum newParentDatum
+        ]
+
+childTrieUTXO :: UTXO
+childTrieUTXO =
+    mconcat
+        [ address trieAddress
+        , withValue outputTrieValue
+        , withInlineDatum childDatum
+        ]
+
+appendTrieContext :: ScriptContext
+appendTrieContext =
+    buildMinting' $
+        mconcat
+            [ input outputTrieUTXO
+            , output parentTrieUTXO
+            , output childTrieUTXO
+            , mint mintTrieValue
+            , withMinting trieCurrencySymbol
+            , withdrawal rewardingCred 0
+            ]
+
+betweenRedeemer :: TrieAction
+betweenRedeemer = Between 0
+
+btNewParentDatum :: TrieDatum
+btNewParentDatum = TrieDatum "" ["68656c6c6f"]
+
+btChildDatum :: TrieDatum
+btChildDatum = TrieDatum "68656c6c6f" ["5f776f726c64"]
+
+newParentTrieUTXO :: UTXO
+newParentTrieUTXO =
+    mconcat
+        [ address trieAddress
+        , withValue outputTrieValue
+        , withInlineDatum btNewParentDatum
+        ]
+
+btChildTrieUTXO :: UTXO
+btChildTrieUTXO =
+    mconcat
+        [ address trieAddress
+        , withValue outputTrieValue
+        , withInlineDatum btChildDatum
+        ]
+
+betweenTrieContext :: ScriptContext
+betweenTrieContext =
+    buildMinting' $
+        mconcat
+            [ input parentTrieUTXO
+            , output newParentTrieUTXO
+            , output btChildTrieUTXO
+            , mint mintTrieValue
+            , withMinting trieCurrencySymbol
+            , withdrawal rewardingCred 0
+            ]
+
+duplicateInsertionNewParentDatum :: TrieDatum
+duplicateInsertionNewParentDatum = TrieDatum "" ["68656c6c6f5f776f726c64"]
+
+duplicateInsertionChildDatum :: TrieDatum
+duplicateInsertionChildDatum = TrieDatum "68656c6c6f5f776f726c64" []
+
+duplicateInsertionNewParentTrieUTXO :: UTXO
+duplicateInsertionNewParentTrieUTXO =
+    mconcat
+        [ address trieAddress
+        , withValue outputTrieValue
+        , withInlineDatum duplicateInsertionNewParentDatum
+        ]
+
+duplicateInsertionChildTrieUTXO :: UTXO
+duplicateInsertionChildTrieUTXO =
+    mconcat
+        [ address trieAddress
+        , withValue outputTrieValue
+        , withInlineDatum duplicateInsertionChildDatum
+        ]
+
+duplicateInsertionBetweenTrieContext :: ScriptContext
+duplicateInsertionBetweenTrieContext =
+    buildMinting' $
+        mconcat
+            [ input parentTrieUTXO
+            , output duplicateInsertionNewParentTrieUTXO
+            , output duplicateInsertionChildTrieUTXO
+            , mint mintTrieValue
+            , withMinting trieCurrencySymbol
+            , withdrawal rewardingCred 0
+            ]
+
 unitTest :: TestTree
 unitTest = tryFromPTerm "Trie Unit Test" validator $ do
     testEvalCase
-        "Pass"
+        "Pass - Create Trie"
         Success
         [ PlutusTx.toData genesisRedeemer
         , PlutusTx.toData createTrieContext
+        ]
+    testEvalCase
+        "Fail - Create Trie"
+        Failure
+        [ PlutusTx.toData genesisRedeemer
+        , PlutusTx.toData createTrieInvalidContext
+        ]
+    testEvalCase
+        "Pass - Append Onto Trie"
+        Success
+        [ PlutusTx.toData appendRedeemer
+        , PlutusTx.toData appendTrieContext
+        ]
+    testEvalCase
+        "Pass - Append Between Trie"
+        Success
+        [ PlutusTx.toData betweenRedeemer
+        , PlutusTx.toData betweenTrieContext
+        ]
+    testEvalCase
+        "Fail - Duplicate Insertion Trie"
+        Success
+        [ PlutusTx.toData betweenRedeemer
+        , PlutusTx.toData duplicateInsertionBetweenTrieContext
         ]
