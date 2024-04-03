@@ -155,3 +155,35 @@ test-suite plutarch-trie-test
     Spec.UtilsSpec
 
   build-depends:  plutarch-trie
+
+executable plutarch-trie-exec
+  import:         lang
+  main-is:        Main.hs
+
+  -- Modules included in this executable, other than Main.
+  -- other-modules:
+
+  -- LANGUAGE extensions used by modules in this package.
+  -- other-extensions:
+  build-depends:
+    , aeson
+    , aeson-pretty
+    , base
+    , base16-bytestring
+    , bytestring
+    , cardano-binary
+    , data-default
+    , liqwid-plutarch-extra
+    , plutarch
+    , plutarch-extra
+    , plutarch-trie
+    , plutus-core
+    , plutus-ledger-api
+    , plutus-tx
+    , ply-core
+    , ply-plutarch
+    , prettyprinter
+    , serialise
+    , text
+
+  hs-source-dirs: app

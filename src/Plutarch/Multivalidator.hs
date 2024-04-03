@@ -1,4 +1,8 @@
-module Plutarch.Multivalidator (multivalidator, spend, main) where
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-local-binds #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+
+module Plutarch.Multivalidator (validator, multivalidator, spend, main) where
 
 import Plutarch.Api.V1 (PCredential (..))
 import Plutarch.Api.V1.AssocMap qualified as AssocMap
@@ -11,8 +15,10 @@ import "liqwid-plutarch-extra" Plutarch.Extra.TermCont (
     pletC,
     pletFieldsC,
     pmatchC,
+    ptraceC,
  )
 
+import Plutarch.ByteString (pbyteStr)
 import Plutarch.Trie (ptrieHandler)
 import Plutarch.Types (PTrieAction (..))
 
@@ -36,8 +42,9 @@ multivalidator mintingPolicy spendingValidator = plam $ \redeemerOrDatum scriptC
         (punsafeCoerce $ mintingPolicy # redeemerOrDatum # (punsafeCoerce scriptContextOrRedeemer))
 
 spend :: Term s PValidator
-spend = phoistAcyclic $
+spend =
     plam $ \_ _ ctx -> unTermCont $ do
+        ptraceC "spend"
         ctxF <- pletFieldsC @'["txInfo", "purpose"] ctx
         PSpending ownRef' <- pmatchC ctxF.purpose
         ownRef <- pletC $ pfield @"_0" # ownRef'
@@ -51,18 +58,20 @@ spend = phoistAcyclic $
                 PNothing -> perror
 
 main :: Term s PStakeValidator
-main = phoistAcyclic $
+main =
     plam $ \redeemer ctx -> unTermCont $ do
+        ptraceC "main"
         ctxF <- pletFieldsC @'["txInfo", "purpose"] ctx
         txInfoF <- pletFieldsC @'["wdrl"] ctxF.txInfo
+        ptraceC (pshow txInfoF.wdrl)
         return $
             pmatch ctxF.purpose $ \case
-                PMinting ((pfield @"_0" #) -> policy) -> do
+                PMinting ((pfield @"_0" #) -> policy) ->
                     let csByteString = (pfromData . pto) policy
-                    let ownCredential = pcon $ PStakingHash $ pdcons @"_0" # (pdata $ pcon $ PScriptCredential $ pdcons @"_0" # (pdata . pcon . PScriptHash) csByteString # pdnil) # pdnil
+                        ownCredential = pcon $ PStakingHash $ pdcons @"_0" # (pdata $ pcon $ PScriptCredential $ pdcons @"_0" # (pdata . pcon . PScriptHash) csByteString # pdnil) # pdnil
                      in pmatch (AssocMap.plookup # ownCredential # txInfoF.wdrl) $ \case
                             PJust _ -> (popaque $ pconstant ())
-                            PNothing -> perror
+                            PNothing -> ptraceError (pshow ownCredential)
                 PRewarding ((pfield @"_0" #) -> stakeCred) ->
                     let red = punsafeCoerce @_ @_ @PTrieAction redeemer
                      in pif
@@ -70,3 +79,6 @@ main = phoistAcyclic $
                             (popaque $ pconstant ())
                             perror
                 _ -> perror
+
+validator :: Term s PValidator
+validator = multivalidator main spend

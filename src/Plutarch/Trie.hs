@@ -4,6 +4,9 @@
 -- {-# LANGUAGE ScopedTypeVariables #-}
 -- {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-local-binds #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 
 module Plutarch.Trie (
     ptrieHandler,
@@ -15,19 +18,19 @@ import Plutarch.Api.V1.Address (
     PStakingCredential,
  )
 import Plutarch.Api.V1.Maybe (PMaybeData (..))
-import Plutarch.Api.V1.Value (pnormalize)
 import Plutarch.Api.V2 (PCurrencySymbol (..), POutputDatum (..), PStakingCredential (..), PTxInInfo)
 import Plutarch.Api.V2.Contexts (PTxInfo)
 import Plutarch.Builtin (pforgetData, pserialiseData)
 import Plutarch.Crypto (pblake2b_256)
-import Plutarch.Extra.ScriptContext (pfromPDatum)
+import Plutarch.Extra.ScriptContext (pfromPDatum, ptryFromInlineDatum)
 import Plutarch.Monadic qualified as P
 import Plutarch.Prelude
 import Plutarch.Types (
     PTrieAction (..),
     PTrieDatum (..),
  )
-import Plutarch.Utils (dataListReplace, passert, pcompareBS, pgetTrieId, pheadSingleton, pinsert, premoveElement, ptryLookupValue, toHex)
+import Plutarch.Utils (dataListReplace, passert, pcompareBS, pinsert)
+import Plutarch.Utils qualified as Utils
 
 ptrieHandler ::
     ClosedTerm
@@ -36,32 +39,36 @@ ptrieHandler ::
             :--> PTxInfo
             :--> PBool
         )
-ptrieHandler = phoistAcyclic $
+ptrieHandler =
     plam $ \cred rdm txinfo' -> P.do
         PStakingHash ((pfield @"_0" #) -> ownCredential) <- pmatch cred
         PScriptCredential ((pfield @"_0" #) -> ownCurrencySymbolByteString) <- pmatch ownCredential
-        let ownCurrencySymbol = (pcon . PCurrencySymbol . pfromData . pto) ownCurrencySymbolByteString
+        ownCurrencySymbol <- plet $ (pcon . PCurrencySymbol . pfromData . pto) ownCurrencySymbolByteString
         txinfoF <- pletFields @'["inputs", "outputs", "mint"] txinfo'
         inputs <- plet $ pfromData txinfoF.inputs
         outputs <- plet $ pfromData txinfoF.outputs
-        let ins = pfilter @PBuiltinList # plam (\inp -> hasCredential # cred # inp) # inputs
+        let ins = pfilter @PBuiltinList # plam (\inp -> hasCredential # ownCredential # inp) # inputs
+        toHex <- plet Utils.toHex
+        premoveElement <- plet Utils.premoveElement
+        ptryLookupValue <- plet Utils.ptryLookupValue
+        pgetTrieId <- plet Utils.pgetTrieId
+        pheadSingleton <- plet Utils.pheadSingleton
+        pnormalize <- plet Utils.pnormalize
         pmatch rdm $ \case
             PGenesis info -> P.do
                 infoF <- pletFields @'["inp", "oidx"] info
-                let trieId = pblake2b_256 # (pserialiseData # pforgetData infoF.inp)
-                    expectedOutputs = premoveElement # infoF.oidx # outputs
-                    newOutput = pelemAt # 0 # expectedOutputs
-                    osOutput = pelemAt # 1 # expectedOutputs
+                trieId <- plet $ pblake2b_256 # (pserialiseData # pforgetData infoF.inp)
+                expectedOutputs <- plet $ premoveElement # infoF.oidx # outputs
+                let newOutput = pelemAt # 0 # expectedOutputs
+                let osOutput = pelemAt # 1 # expectedOutputs
                 newOutputF <- pletFields @'["address", "value", "datum"] newOutput
                 osOutputF <- pletFields @'["address", "value", "datum"] osOutput
-                POutputDatum newRawDatum' <- pmatch newOutputF.datum
-                POutputDatum osRawDatum' <- pmatch osOutputF.datum
-                let newRawDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # newRawDatum')
-                    newValue = pfromData newOutputF.value
-                    osRawDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # osRawDatum')
-                    osValue = pfromData osOutputF.value
-                    newId = pgetTrieId # newValue # ownCurrencySymbol
-                    osId = pgetTrieId # osValue # ownCurrencySymbol
+                let newRawDatum = pfromPDatum @PTrieDatum # (ptryFromInlineDatum # newOutputF.datum)
+                let newValue = pfromData newOutputF.value
+                let osRawDatum = pfromPDatum @PTrieDatum # (ptryFromInlineDatum # osOutputF.datum)
+                let osValue = pfromData osOutputF.value
+                let newId = pgetTrieId # newValue # ownCurrencySymbol
+                let osId = pgetTrieId # osValue # ownCurrencySymbol
                 PTrieDatum newDatum <- pmatch newRawDatum
                 PTrieOriginState _ <- pmatch osRawDatum
                 newDatumF <- pletFields @'["key", "children"] newDatum
@@ -69,25 +76,16 @@ ptrieHandler = phoistAcyclic $
                 passert
                     "Must include the genesis input"
                     ( pany @PBuiltinList
-                        # plam
-                            ( \inp ->
-                                let outRef = pfield @"outRef" # inp
-                                 in pif (outRef #== infoF.inp) (pcon PTrue) (pcon PFalse)
-                            )
+                        # plam (\inp -> pfield @"outRef" # inp #== infoF.inp)
                         # inputs
                     )
                 passert "Must empty key" (pfromData newDatumF.key #== pconstant "")
                 passert "Must no children" (pnull # pfromData newDatumF.children)
-                let tkPairs = ptryLookupValue # pdata ownCurrencySymbol # (pnormalize # txinfoF.mint)
-                    tkPair = pheadSingleton # tkPairs
-                    numMinted = psndBuiltin # tkPair
-                    tkMinted = pfstBuiltin # tkPair
-                    mintChecks =
-                        pfromData numMinted
-                            #== 2
-                            #&& trieId
-                            #== pto (pfromData tkMinted)
-
+                tkPairs <- plet $ ptryLookupValue # ownCurrencySymbol # (pnormalize # txinfoF.mint)
+                tkPair <- plet $ pheadSingleton # tkPairs
+                numMinted <- plet $ psndBuiltin # tkPair
+                tkMinted <- plet $ pfstBuiltin # tkPair
+                mintChecks <- plet $ pfromData numMinted #== 2 #&& trieId #== pto (pfromData tkMinted)
                 passert "Incorrect Minting" mintChecks
                 pif
                     (ptraceIfFalse "Trie Handler f1" (pnull # ins))
@@ -95,48 +93,40 @@ ptrieHandler = phoistAcyclic $
                     (pcon PFalse)
             POnto info -> P.do
                 infoF <- pletFields @'["oidx"] info
-                let expectedOutputs = premoveElement # infoF.oidx # outputs
-                    headInput = pelemAt # 0 # inputs
-                    continuingOutput = pelemAt # 0 # expectedOutputs
-                    newOutput = pelemAt # 1 # expectedOutputs
+                expectedOutputs <- plet $ premoveElement # infoF.oidx # outputs
+                let headInput = pelemAt # 0 # inputs
+                let continuingOutput = pelemAt # 0 # expectedOutputs
+                let newOutput = pelemAt # 1 # expectedOutputs
                 headInputF <- pletFields @["address", "value", "datum"] $ pfield @"resolved" # headInput
                 continuingOutputF <- pletFields @'["address", "value", "datum"] continuingOutput
                 newOutputF <- pletFields @'["address", "value", "datum"] newOutput
-                let trieId = pgetTrieId # headInputF.value # ownCurrencySymbol
-                POutputDatum rawHeadDatum' <- pmatch headInputF.datum
-                POutputDatum rawContinuingDatum' <- pmatch continuingOutputF.datum
-                POutputDatum rawNewDatum' <- pmatch newOutputF.datum
-                let rawHeadDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawHeadDatum')
-                    rawContinuingDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawContinuingDatum')
-                    rawNewDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawNewDatum')
+                trieId <- plet $ pgetTrieId # headInputF.value # ownCurrencySymbol
+                let rawHeadDatum = pfromPDatum @PTrieDatum # (ptryFromInlineDatum # headInputF.datum)
+                let rawContinuingDatum = pfromPDatum @PTrieDatum # (ptryFromInlineDatum # continuingOutputF.datum)
+                let rawNewDatum = pfromPDatum @PTrieDatum # (ptryFromInlineDatum # newOutputF.datum)
                 PTrieDatum headDatum <- pmatch rawHeadDatum
                 PTrieDatum continuingDatum <- pmatch rawContinuingDatum
                 PTrieDatum newDatum <- pmatch rawNewDatum
                 headDatumF <- pletFields @'["key", "children"] headDatum
                 continuingDatumF <- pletFields @'["key", "children"] continuingDatum
                 newDatumF <- pletFields @'["key", "children"] newDatum
-                let headKey = toHex # headDatumF.key
-                    headKeyLength = plengthBS # headKey
-                    contKey = toHex # continuingDatumF.key
-                    newKey = toHex # newDatumF.key
-                    newKeySuffix = psliceBS # headKeyLength # (plengthBS # newKey - headKeyLength) # newKey
-                    newKeySuffixFirstChar = psliceBS # 0 # 1 # newKeySuffix
-                    contId = pgetTrieId # continuingOutputF.value # ownCurrencySymbol
-                    newId = pgetTrieId # newOutputF.value # ownCurrencySymbol
-                    tkPairs = ptryLookupValue # pdata ownCurrencySymbol # (pnormalize # txinfoF.mint)
-                    tkPair = pheadSingleton # tkPairs
-                    numMinted = psndBuiltin # tkPair
-                    tkMinted = pfstBuiltin # tkPair
-                    mintChecks =
-                        pfromData numMinted
-                            #== 1
-                            #&& trieId
-                            #== pto (pfromData tkMinted)
+                headKey <- plet $ toHex # headDatumF.key
+                headKeyLength <- plet $ plengthBS # headKey
+                let contKey = toHex # continuingDatumF.key
+                newKey <- plet $ toHex # newDatumF.key
+                newKeySuffix <- plet $ psliceBS # headKeyLength # (plengthBS # newKey - headKeyLength) # newKey
+                let newKeySuffixFirstChar = psliceBS # 0 # 1 # newKeySuffix
+                let contId = pgetTrieId # continuingOutputF.value # ownCurrencySymbol
+                let newId = pgetTrieId # newOutputF.value # ownCurrencySymbol
+                let tkPairs = ptryLookupValue # ownCurrencySymbol # (pnormalize # txinfoF.mint)
+                tkPair <- plet $ pheadSingleton # tkPairs
+                let numMinted = psndBuiltin # tkPair
+                let tkMinted = pfstBuiltin # tkPair
                 passert "Must cont key == head key" (contId #== trieId #&& newId #== trieId)
                 passert "Incorrect ids" (contKey #== headKey)
                 passert "Incorrect new key" (headKey #== (psliceBS # 0 # headKeyLength # newKey))
                 passert "Must empty new key suffix" (newKeySuffix #== pconstant "")
-                passert "Incorrect Minting" mintChecks
+                passert "Incorrect Minting" (pfromData numMinted #== 1 #&& trieId #== pto (pfromData tkMinted))
                 passert
                     "Must continuing UTxO has 1 single new child"
                     ( (pinsert # pcompareBS # newKeySuffix # (pmap @PBuiltinList # plam (\child -> pfromData child) # headDatumF.children))
@@ -158,33 +148,30 @@ ptrieHandler = phoistAcyclic $
                     (pcon PFalse)
             PBetween info -> P.do
                 infoF <- pletFields @'["oidx"] info
-                let expectedOutputs = premoveElement # infoF.oidx # outputs
-                    parentInput = pelemAt # 0 # inputs
-                    continuingOutput = pelemAt # 0 # expectedOutputs
-                    newOutput = pelemAt # 1 # expectedOutputs
+                expectedOutputs <- plet $ premoveElement # infoF.oidx # outputs
+                parentInput <- plet $ pelemAt # 0 # inputs
+                continuingOutput <- plet $ pelemAt # 0 # expectedOutputs
+                newOutput <- plet $ pelemAt # 1 # expectedOutputs
                 parentInputF <- pletFields @["address", "value", "datum"] $ pfield @"resolved" # parentInput
                 continuingOutputF <- pletFields @'["address", "value", "datum"] continuingOutput
                 newOutputF <- pletFields @'["address", "value", "datum"] newOutput
-                POutputDatum rawParentDatum' <- pmatch parentInputF.datum
-                POutputDatum rawContinuingDatum' <- pmatch continuingOutputF.datum
-                POutputDatum rawNewDatum' <- pmatch newOutputF.datum
-                let rawParentDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawParentDatum')
-                    rawContinuingDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawContinuingDatum')
-                    rawNewDatum = pfromPDatum @PTrieDatum # (pfield @"outputDatum" # rawNewDatum')
+                rawParentDatum <- plet $ pfromPDatum @PTrieDatum # (ptryFromInlineDatum # parentInputF.datum)
+                rawContinuingDatum <- plet $ pfromPDatum @PTrieDatum # (ptryFromInlineDatum # continuingOutputF.datum)
+                rawNewDatum <- plet $ pfromPDatum @PTrieDatum # (ptryFromInlineDatum # newOutputF.datum)
                 PTrieDatum parentDatum <- pmatch rawParentDatum
                 PTrieDatum continuingDatum <- pmatch rawContinuingDatum
                 PTrieDatum newDatum <- pmatch rawNewDatum
                 parentDatumF <- pletFields @'["key", "children"] parentDatum
                 continuingDatumF <- pletFields @'["key", "children"] continuingDatum
                 newDatumF <- pletFields @'["key", "children"] newDatum
-                let parentKey = toHex # parentDatumF.key
-                    parentKeyLength = plengthBS # parentKey
-                    contKey = toHex # continuingDatumF.key
-                    newKey = toHex # newDatumF.key
-                    newKeySuffix = psliceBS # parentKeyLength # (plengthBS # newKey - parentKeyLength) # newKey
-                    newKeySuffixFirstChar = psliceBS # 0 # 1 # newKeySuffix
-                    newKeySuffixLength = plengthBS # newKeySuffix
-                    contId = pgetTrieId # continuingOutputF.value # ownCurrencySymbol
+                parentKey <- plet $ toHex # parentDatumF.key
+                parentKeyLength <- plet $ plengthBS # parentKey
+                contKey <- plet $ toHex # continuingDatumF.key
+                newKey <- plet $ toHex # newDatumF.key
+                newKeySuffix <- plet $ psliceBS # parentKeyLength # (plengthBS # newKey - parentKeyLength) # newKey
+                newKeySuffixFirstChar <- plet $ psliceBS # 0 # 1 # newKeySuffix
+                newKeySuffixLength <- plet $ plengthBS # newKeySuffix
+                contId <- plet $ pgetTrieId # continuingOutputF.value # ownCurrencySymbol
                 PJust childKeySuffixData <-
                     pmatch $
                         pfind @PBuiltinList
@@ -193,8 +180,9 @@ ptrieHandler = phoistAcyclic $
                                     pif (toHex # (psliceBS # 0 # 1 # pfromData child) #== newKeySuffixFirstChar) (pcon PTrue) (pcon PFalse)
                                 )
                             # parentDatumF.children
-                let childKeySuffix = toHex # pfromData childKeySuffixData
-                    newChildKeySuffix =
+                childKeySuffix <- plet $ toHex # pfromData childKeySuffixData
+                newChildKeySuffix <-
+                    plet $
                         psliceBS # newKeySuffixLength # (plengthBS # childKeySuffix - newKeySuffixLength) # childKeySuffix
 
                 passert
@@ -230,13 +218,10 @@ ptrieHandler = phoistAcyclic $
                     (pcon PTrue)
                     (pcon PFalse)
 
-hasCredential :: ClosedTerm (PStakingCredential :--> PTxInInfo :--> PBool)
-hasCredential = phoistAcyclic $
+hasCredential :: ClosedTerm (PCredential :--> PTxInInfo :--> PBool)
+hasCredential =
     plam $ \cred info -> P.do
         let resolved = pfield @"resolved" # info
             addr = pfield @"address" # resolved
-            -- addr = pfield @"credential" # txoutF // FIXME(@hadelive): it should be credential not staking credential
-            sc = pfield @"stakingCredential" # addr
-        pmatch sc $ \case
-            PDJust ((pfield @"_0" #) -> c) -> pif (cred #== c) (pcon PTrue) (pcon PFalse)
-            _ -> pcon PFalse
+            sc = pfield @"credential" # addr
+        cred #== pfromData sc
