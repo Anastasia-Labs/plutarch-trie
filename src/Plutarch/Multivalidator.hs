@@ -63,6 +63,7 @@ main =
         ptraceC "main"
         ctxF <- pletFieldsC @'["txInfo", "purpose"] ctx
         txInfoF <- pletFieldsC @'["wdrl"] ctxF.txInfo
+        ptraceC (pshow txInfoF.wdrl)
         return $
             pmatch ctxF.purpose $ \case
                 PMinting ((pfield @"_0" #) -> policy) ->
@@ -70,7 +71,7 @@ main =
                         ownCredential = pcon $ PStakingHash $ pdcons @"_0" # (pdata $ pcon $ PScriptCredential $ pdcons @"_0" # (pdata . pcon . PScriptHash) csByteString # pdnil) # pdnil
                      in pmatch (AssocMap.plookup # ownCredential # txInfoF.wdrl) $ \case
                             PJust _ -> (popaque $ pconstant ())
-                            PNothing -> perror
+                            PNothing -> ptraceError (pshow ownCredential)
                 PRewarding ((pfield @"_0" #) -> stakeCred) ->
                     let red = punsafeCoerce @_ @_ @PTrieAction redeemer
                      in pif

@@ -55,6 +55,9 @@ trieAddress =
 genesisRedeemer :: TrieAction
 genesisRedeemer = Genesis (TxOutRef "b1f2f20a8781a3ba967d8c7b5068d21d799e809dcce22f651679d661" 1) 0
 
+rewardingCred :: StakingCredential
+rewardingCred = StakingHash (ScriptCredential "746fa3ba2daded6ab9ccc1e39d3835aa1dfcb9b5a54acc2ebe6b79a4")
+
 trieTokenName :: TokenName
 trieTokenName = "TestTN"
 
@@ -101,7 +104,7 @@ createTrieContext =
             , output outputOriginUTXO
             , mint mintTrieValue
             , withMinting trieCurrencySymbol
-            , withdrawal stakeCred 0
+            , withdrawal rewardingCred 0
             ]
 
 unitTest :: TestTree
