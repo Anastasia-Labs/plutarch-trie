@@ -81,9 +81,6 @@ data PTrieDatum (s :: S)
 instance DerivePlutusType PTrieDatum where type DPTStrat _ = PlutusTypeData
 instance PTryFrom PData PTrieDatum
 
--- deriving anyclass instance
---   PTryFrom PData (PAsData PTrieDatum)
-
 instance PUnsafeLiftDecl PTrieDatum where
     type PLifted PTrieDatum = TrieDatum
 

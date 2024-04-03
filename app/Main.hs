@@ -53,17 +53,6 @@ evalWithArgsT cfg x args = do
     scr <- first (pack . show) escr
     pure (scr, budg, trc)
 
--- writePlutusScript :: String -> FilePath -> ClosedTerm a -> IO ()
--- writePlutusScript title filepath term = do
---   case evalT term of
---     Left e -> putStrLn (show e)
---     Right (script, _, _) -> do
---       let
---         scriptType = "PlutusScriptV2" :: String
---         plutusJson = object ["type" .= scriptType, "description" .= title, "cborHex" .= encodeSerialiseCBOR script]
---         content = encodePretty plutusJson
---       LBS.writeFile filepath content
-
 writePlutusScript :: Config -> String -> FilePath -> ClosedTerm a -> IO ()
 writePlutusScript cfg title filepath term = do
     putStrLn $ "Writing script to file " <> filepath <> "..."
@@ -78,22 +67,15 @@ writePlutusScript cfg title filepath term = do
     putStrLn "...done"
 
 writePlutusScriptTraceBind :: String -> FilePath -> ClosedTerm a -> IO ()
-writePlutusScriptTraceBind title filepath term =
-    writePlutusScript (Config DoTracingAndBinds) title filepath term
+writePlutusScriptTraceBind = writePlutusScript (Config DoTracingAndBinds)
 
 writePlutusScriptTrace :: String -> FilePath -> ClosedTerm a -> IO ()
-writePlutusScriptTrace title filepath term =
-    writePlutusScript (Config DoTracing) title filepath term
+writePlutusScriptTrace = writePlutusScript (Config DoTracing)
 
 writePlutusScriptNoTrace :: String -> FilePath -> ClosedTerm a -> IO ()
-writePlutusScriptNoTrace title filepath term =
-    writePlutusScript (Config NoTracing) title filepath term
+writePlutusScriptNoTrace = writePlutusScript (Config NoTracing)
 
 main :: IO ()
 main = do
     putStrLn "Writing Plutus Scripts to files"
     writePlutusScriptNoTrace "Multivalidator" "./compiled/multivalidator.json" validator
-
--- writePlutusScriptTraceBind "Multivalidator" "./compiled/multivalidatorbind.json" validator
-
--- writePlutusScriptTrace "Multivalidator" "./compiled/multivalidatortrace.json" validator

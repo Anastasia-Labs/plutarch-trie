@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 
 module Plutarch.Utils (
     pinsert,
