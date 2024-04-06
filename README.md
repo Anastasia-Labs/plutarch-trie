@@ -57,6 +57,19 @@ The core of a Trie is its key encoding mechanism. This mechanism takes input key
 Consider a Trie with the keys "car", "cat", and "dog":
 The structure of the Trie after inserting the keys "car", "cat", and "dog" would look something like this:
 
+
+```mermaid
+graph TD
+    ROOT((Root)) -->|c| C(C)
+    C -->|a| A(A)
+    A -->|r| R(R)
+    A -->|t| T(T)
+    ROOT -->|d| D(D)
+    D -->|o| O(O)
+    O -->|g| G(G)
+    ROOT -->|other| OTH((Others))
+```
+
 Imagine the Trie as a tree where each node represents a character. The root node is empty and branches out to three paths: one for "c", one for "d", and potentially others for different starting letters of keys not shown in this example. The "c" node branches into "a", which further branches into "r" and "t" to form the words "car" and "cat". Each of these nodes, "r" and "t", would be leaf nodes for "car" and "cat", respectively, possibly containing values or simply marking the end of the word. Similarly, the "d" node branches into "o", which then branches into "g", forming the word "dog" with "g" as its leaf node. This structure allows for efficient searching, adding, and deleting of keys by following the branches corresponding to each character in the key.
 
 This visual representation helps understand how Tries optimize space and search time, especially with a large number of keys sharing common prefixes. By sharing the initial "ca" in "car" and "cat", the Trie saves space compared to storing each word independently. This efficiency becomes more pronounced with a larger dataset with more shared prefixes.
